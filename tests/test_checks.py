@@ -25,7 +25,7 @@ def test_rule_needs_no_judge(fake_judge):
 
 
 def test_kinds():
-    assert [c.kind for c in CHECKS.values()] == ["rule", "rule", "rule", "judge"]
+    assert [c.kind for c in CHECKS.values()] == ["rule", "rule", "rule", "golden", "golden", "judge"]
 
 
 def test_abstention_rule_on_examples():

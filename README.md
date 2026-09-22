@@ -32,6 +32,7 @@ The built-in checks are code — nothing to download. Enabling a judge (`--judge
 ```bash
 faultgate check traces.json                          # built-in rule checks
 faultgate check traces.json --json report.json       # full per-trace verdicts
+faultgate check traces.json --golden golden.json     # expected answers: correctness + truncation
 faultgate check traces.json --policy policy.json     # what the agent was allowed to do
 faultgate check traces.json --judge laya             # also run judge checks, locally
 faultgate check traces.json --judge litellm:openai/gpt-5.6-luna   # any API model
@@ -62,9 +63,11 @@ Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your e
 | `search_loop` | rule | The run ended with no answer at its step budget and most tool calls returned nothing. |
 | `abstention` | rule | The final answer explicitly says the information could not be found. |
 | `policy` | rule | A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, or call budget. |
+| `wrong_answer` | golden | Answered, and the expected answer is not in the final answer. |
+| `truncation` | golden | The answer has the head of the expected token but not the whole token (`Onyx` for `Onyx-4413`). |
 | `wrong_direction` | judge | On a multi-hop task, the agent walked the dependency chain backwards. |
 
-A **rule** is plain code over the trace structure: instant, deterministic, no model. A **judge** check is a yes/no question a model answers from the rendered trace; it only runs when you pass `--judge`. Both kinds are calibrated the same way, below.
+A **rule** is plain code over the trace structure: instant, deterministic, no model. A **golden** check is a rule that also needs the expected answer (`--golden golden.json`, keyed by scenario or by prompt text). A **judge** check is a yes/no question a model answers from the rendered trace; it only runs when you pass `--judge`. All three kinds are calibrated the same way, below.
 
 ### Policy: what was the agent allowed to do?
 
@@ -108,6 +111,25 @@ Real runs: two `z-ai/glm-5.3-flash` baselines and `openai/gpt-5.6-luna` / `qwen/
 
 It also lists **regressions**: scenarios clean in *every* baseline run and not clean now — the ones to read first. Scenarios are matched across runs by `faultgate.scenario`, else `gen_ai.agent.id`, else a hash of the prompt.
 
+With expected answers the gate grades correctness too, and the numbers land on P11's exactly:
+
+```
+$ faultgate baseline examples/gate/baseline_glm_run*.json --golden examples/gate/golden.json --out band.json
+examples/gate/baseline_glm_run1.json: 30 traces · clean rate 0.80 · 0.0s      # P11: 24/30 grounded
+examples/gate/baseline_glm_run2.json: 30 traces · clean rate 0.87 · 0.0s      # P11: 26/30 grounded
+band [0.80, 0.87] over 30 scenarios × 2 runs · 21 clean in every run
+
+$ faultgate check examples/gate/candidate_gpt.json --golden examples/gate/golden.json --band band.json
+21/30 traces failed · search_loop=18, abstention=0, policy=0, wrong_answer=3, truncation=3
+gate: FAIL · clean rate 0.30 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70
+
+$ faultgate check examples/gate/candidate_qwen.json --golden examples/gate/golden.json --band band.json
+18/30 traces failed · search_loop=9, abstention=0, policy=0, wrong_answer=9, truncation=8
+gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70
+```
+
+(Qwen returns the head of the answer token without its suffix in 8 of 30 runs. Nobody had noticed.)
+
 ## How much to trust a verdict
 
 This is the part every evaluation tool skips. Every check and judge here is scored against **human failure-mode labels** on 200 real agent runs (FAULTLINE P4), reported on all 200 and on P5's frozen test split (n = 60). Regenerate with `scripts/calibrate.py`.
@@ -117,13 +139,16 @@ This is the part every evaluation tool skips. Every check and judge here is scor
 | `search_loop` | rule | 36 | 1.00 | 0.99 | **0.98** | **1.00** |
 | `abstention` | rule | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
 | `policy` | rule | synthetic | 4/4 P9 categories | 0 FP on 290 real traces | — | — |
+| `wrong_answer` | golden | 4 | 1.00 | 1.00 | 1.00 | 1.00 |
+| `truncation` | golden | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
 | `wrong_direction` | Laya judge | 1 | 1.00 | 0.61 | 0.02 | 0.00 |
 
 For comparison, the same `search_loop` question put to judges instead of a rule: Laya κ 0.09, GLM-5.3 (API) κ −0.03. **Where a failure is structural, code beats every model we measured**, which is why the default checks are rules.
 
 Read the table honestly:
 - `search_loop` is solid on this task family. The human coder saw the same structural signals, so κ measures agreement with that coding, not ground truth from nowhere.
-- `abstention` has one positive to learn from. The rule is a phrase list; a paraphrase it doesn't know is a miss.
+- `abstention` and `truncation` have one positive each to learn from. `abstention` is a phrase list; a paraphrase it doesn't know is a miss.
+- `wrong_answer` agrees with the human verdict on all 21 answered runs. It is substring containment, case-insensitive: right for short factual answers, wrong for free-text ones — say what "expected" means for your task before you trust it.
 - `policy` has no human-labelled positives: FAULTLINE's agent rejects hostile calls before they become steps, so its traces never contain an executed attack. Recall is by construction on the P9 attack shapes; the number that matters is zero false positives on real runs.
 - `wrong_direction` is the only check that needs reading, and the only local judge we have is noise on it (fires on 39% of clean runs). It ships because the contract is the product: the day a local model scores κ ≥ 0.7 on it, that's a one-line adapter, and this harness is what proves it.
 - Laya's context is 512 tokens. `faultgate` compacts the trace to fit (answer and termination first, middle steps elided) and counts every call that still overflows; the count is printed.
@@ -143,7 +168,7 @@ class Judge(Protocol):
 
 ## What it doesn't do yet
 
-- **Golden answers.** `--golden` unlocks two more P5 checks (answer truncation, premature stop).
+- **Premature stop** (answered with an intermediate entity of the chain). Needs the traversal chain, not just the final answer.
 - **Semantic injection checks** (the agent obeyed text it read). P9 has the taxonomy; needs a judge that scores.
 - **A GitHub Action.** Rules-only runs need nothing but Python, so this is close.
 - **Running your agent.** `faultgate` reads traces; it never executes anything.

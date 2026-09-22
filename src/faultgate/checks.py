@@ -30,10 +30,11 @@ class Check:
     description: str
     question: str | None = None            # asked of the judge
     rule: Callable[[Trace], Verdict] | None = None  # or decided by code
+    needs: str | None = None               # "golden": only runs when --golden is given
 
     @property
     def kind(self) -> str:
-        return "rule" if self.rule else "judge"
+        return "judge" if self.question else ("golden" if self.needs == "golden" else "rule")
 
 
 def _empty_result(result: str) -> bool:
@@ -137,6 +138,46 @@ def policy_rule(t: Trace, policy: Policy) -> Verdict:
     return Verdict(bool(bad), 1.0, "; ".join(bad) if bad else f"{len(steps)} calls within policy")
 
 
+class Golden(dict):
+    """Expected final answers, keyed by scenario key (faultgate.scenario / gen_ai.agent.id / prompt hash) or by the prompt text itself."""
+
+    @classmethod
+    def load(cls, path: str | Path) -> "Golden":
+        d = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(d, dict) or not all(isinstance(v, str) for v in d.values()):
+            raise ValueError("golden: expected a JSON object of {scenario key or prompt: expected answer}")
+        return cls(d)
+
+    def expected(self, t: Trace) -> str | None:
+        return self.get(t.key) or self.get(t.prompt)
+
+
+def wrong_answer_rule(t: Trace, golden: Golden) -> Verdict:
+    """Answered, and the expected answer does not appear in the final answer (case-insensitive)."""
+    exp = golden.expected(t)
+    if exp is None:
+        return Verdict(False, 0.0, "no golden answer for this scenario")
+    ans = t.answer.strip()
+    if not ans:
+        return Verdict(False, 1.0, "no answer to grade")
+    ok = exp.lower() in ans.lower()
+    return Verdict(not ok, 1.0, f"expected {exp!r} {'found' if ok else 'not found'} in answer")
+
+
+def truncation_rule(t: Trace, golden: Golden) -> Verdict:
+    """Answer carries the head of the expected token but not the whole token — e.g. 'Onyx' for 'Onyx-4413'."""
+    exp = golden.expected(t)
+    ans = t.answer.strip()
+    if exp is None or not ans:
+        return Verdict(False, 0.0 if exp is None else 1.0, "no golden answer for this scenario" if exp is None else "no answer to grade")
+    if exp.lower() in ans.lower():
+        return Verdict(False, 1.0, "expected answer present in full")
+    head = re.split(r"[-_/ ]", exp, maxsplit=1)[0]
+    if len(head) >= 3 and head != exp and re.search(r"\b" + re.escape(head) + r"\b", ans, re.I):
+        return Verdict(True, 1.0, f"answer has {head!r} but not {exp!r}")
+    return Verdict(False, 1.0, "no truncated form of the expected answer")
+
+
 CHECKS: dict[str, Check] = {
     c.name: c
     for c in (
@@ -156,6 +197,16 @@ CHECKS: dict[str, Check] = {
             rule=partial(policy_rule, policy=Policy()),
         ),
         Check(
+            "wrong_answer",
+            "Answered, but the expected answer is not in the final answer (needs --golden).",
+            rule=None, needs="golden",
+        ),
+        Check(
+            "truncation",
+            "Answer has the head of the expected token but not the whole token (needs --golden).",
+            rule=None, needs="golden",
+        ),
+        Check(
             "wrong_direction",
             "Agent searched the dependency chain backwards on a multi-hop task.",
             question="Determine whether the agent made a MULTI_HOP_DIRECTION_ERROR. "
@@ -165,7 +216,14 @@ CHECKS: dict[str, Check] = {
 }
 
 
-def select(names: str | None, policy: Policy | None = None) -> list[Check]:
+GOLDEN_RULES = {"wrong_answer": wrong_answer_rule, "truncation": truncation_rule}
+
+
+def select(names: str | None, policy: Policy | None = None, golden: Golden | None = None) -> list[Check]:
+    """Resolve check names; bind a policy / golden file to the checks that take one.
+
+    A golden check with no golden file keeps ``rule=None`` and is skipped by the runner.
+    """
     wanted = [n.strip() for n in names.split(",")] if names else list(CHECKS)
     out = []
     for n in wanted:
@@ -174,5 +232,7 @@ def select(names: str | None, policy: Policy | None = None) -> list[Check]:
         c = CHECKS[n]
         if n == "policy" and policy is not None:
             c = Check(c.name, c.description, rule=partial(policy_rule, policy=policy))
+        if n in GOLDEN_RULES and golden is not None:
+            c = Check(c.name, c.description, rule=partial(GOLDEN_RULES[n], golden=golden), needs="golden")
         out.append(c)
     return out

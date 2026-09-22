@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from faultgate.checks import CHECKS  # noqa: E402
+from faultgate.checks import Golden, select  # noqa: E402
 from faultgate.judge import get_judge  # noqa: E402
 from faultgate.runner import run  # noqa: E402
 from faultgate.trace import Span, Trace  # noqa: E402
@@ -28,8 +28,15 @@ from faultgate.trace import Span, Trace  # noqa: E402
 LABEL = {  # faultgate check -> P4 axial failure mode
     "search_loop": "OVERCONSTRAINED_SEARCH_LOOP",
     "abstention": "RETRIEVAL_FAILURE_ABSTENTION",
+    "truncation": "ANSWER_EXTRACTION_TRUNCATION",
     "wrong_direction": "MULTI_HOP_DIRECTION_ERROR",
 }
+
+
+def truth(check: str, row: dict) -> bool:
+    if check == "wrong_answer":  # the human verdict on an answered run
+        return row["status"] == "answered" and row["verdict"] == "FAIL"
+    return row["axial_failure_mode"] == LABEL[check]
 
 
 def to_trace(row: dict, sheet: dict) -> Trace:
@@ -68,16 +75,16 @@ def kappa(tp: int, fp: int, fn: int, tn: int) -> float | None:
 
 def score(report, sheet, ids) -> dict:
     out = {}
-    for check, mode in LABEL.items():
+    for check in ("search_loop", "abstention", "wrong_answer", "truncation", "wrong_direction"):
         if check not in report.checks:
             continue
         tp = fp = fn = tn = 0
         for r in report.results:
             if r.check != check or r.scenario not in ids:
                 continue
-            truth = sheet[r.scenario]["axial_failure_mode"] == mode
+            t = truth(check, sheet[r.scenario])
             pred = r.verdict.detected
-            tp += truth and pred; fp += (not truth) and pred; fn += truth and (not pred); tn += (not truth) and (not pred)
+            tp += t and pred; fp += (not t) and pred; fn += t and (not pred); tn += (not t) and (not pred)
         out[check] = {"tp": tp, "fp": fp, "fn": fn, "tn": tn, "positives": tp + fn,
                       "tpr": round(tp / (tp + fn), 3) if tp + fn else None,
                       "tnr": round(tn / (tn + fp), 3) if tn + fp else None,
@@ -99,9 +106,10 @@ def main() -> int:
     if a.limit:
         rows = rows[: a.limit]
     traces = [to_trace(r, sheet) for r in rows]
+    golden = Golden({sid: r["expected_answer"] for sid, r in sheet.items()})
     judge = get_judge(a.judge) if a.judge else None
     t0 = time.perf_counter()
-    report = run(traces, list(CHECKS.values()), judge)
+    report = run(traces, select(None, golden=golden), judge)
     elapsed = time.perf_counter() - t0
     res = {"judge": report.judge, "n": len(traces), "seconds": round(elapsed, 1),
            "truncated": f"{getattr(judge, 'truncated', 0)}/{getattr(judge, 'calls', 0)}",

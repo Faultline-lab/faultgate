@@ -73,8 +73,8 @@ class Report:
 
 
 def run(traces: list[Trace], checks: list[Check], judge: Judge | None = None) -> Report:
-    """Rules always run. Judge checks run only when a judge is given; otherwise they are dropped from the report."""
-    active = [c for c in checks if c.rule or judge is not None]
+    """Rules always run. Judge checks need a judge, golden checks a golden file; unbound ones are dropped from the report."""
+    active = [c for c in checks if c.rule or (c.question and judge is not None)]
     report = Report(judge=judge.name if judge else "none", checks=[c.name for c in active])
     for t in traces:
         state = None
