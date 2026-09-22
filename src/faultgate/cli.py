@@ -9,7 +9,7 @@ from pathlib import Path
 
 from faultgate import __version__
 from faultgate import band as bandmod
-from faultgate.checks import CHECKS, select
+from faultgate.checks import CHECKS, Policy, select
 from faultgate.judge import JUDGE_SPECS, get_judge
 from faultgate.runner import Report
 from faultgate.runner import run as run_checks
@@ -58,9 +58,13 @@ def _judge_or_none(args, checks):
     return judge
 
 
+def _policy(args) -> Policy | None:
+    return Policy.load(args.policy) if args.policy else None
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     try:
-        checks = select(args.check)
+        checks = select(args.check, _policy(args))
         judge = _judge_or_none(args, checks)
         band = json.loads(Path(args.band).read_text(encoding="utf-8")) if args.band else None
         report, elapsed = _run(args.traces, checks, judge)
@@ -95,7 +99,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 def cmd_baseline(args: argparse.Namespace) -> int:
     try:
-        checks = select(args.check)
+        checks = select(args.check, _policy(args))
         judge = _judge_or_none(args, checks)
         reports = []
         for path in args.traces:
@@ -136,11 +140,13 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--check", default=None, help="comma-separated subset of checks (default: all)")
     c.add_argument("--json", default=None, help="also write the full report to this path")
     c.add_argument("--band", default=None, help="band.json from `faultgate baseline`; exit 1 only on FAIL, not on noise")
+    c.add_argument("--policy", default=None, help='policy.json: {"allow": [...], "max_calls": N, "max_arg_chars": N, "deny_patterns": [...]}')
     c.set_defaults(fn=cmd_check)
     b = sub.add_parser("baseline", help="build a tolerance band from >= 2 baseline runs of the same scenarios")
     b.add_argument("traces", nargs="+", help="OTLP JSON files, one per baseline run")
     b.add_argument("--judge", default=None)
     b.add_argument("--check", default=None)
+    b.add_argument("--policy", default=None)
     b.add_argument("--out", default="band.json")
     b.set_defaults(fn=cmd_baseline)
     sub.add_parser("checks", help="list built-in checks").set_defaults(fn=cmd_checks)

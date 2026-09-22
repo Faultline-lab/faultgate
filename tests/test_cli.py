@@ -18,7 +18,7 @@ def test_exit_1_when_fired(patched, capsys, tmp_path):
     assert cli.main(["check", str(EXAMPLES), "--judge", "fake", "--json", str(out)]) == 1
     text = capsys.readouterr().out
     assert "2/5 traces failed" in text and "FAIL" in text  # rule catches the loop, fake judge the abstention
-    assert json.loads(out.read_text())["fired"] == {"search_loop": 1, "abstention": 1, "wrong_direction": 1}
+    assert json.loads(out.read_text())["fired"] == {"search_loop": 1, "abstention": 1, "policy": 0, "wrong_direction": 1}
 
 
 def test_exit_0_when_clean(monkeypatch):

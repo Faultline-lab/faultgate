@@ -1,0 +1,1 @@
+{"allow": ["search","lookup","calc"], "max_calls": 10, "max_arg_chars": 200}

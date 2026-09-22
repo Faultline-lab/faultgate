@@ -32,6 +32,7 @@ The built-in checks are code — nothing to download. Enabling a judge (`--judge
 ```bash
 faultgate check traces.json                          # built-in rule checks
 faultgate check traces.json --json report.json       # full per-trace verdicts
+faultgate check traces.json --policy policy.json     # what the agent was allowed to do
 faultgate check traces.json --judge laya             # also run judge checks, locally
 faultgate check traces.json --judge litellm:openai/gpt-5.6-luna   # any API model
 faultgate checks                                     # list checks and their kind
@@ -60,9 +61,20 @@ Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your e
 |---|---|---|
 | `search_loop` | rule | The run ended with no answer at its step budget and most tool calls returned nothing. |
 | `abstention` | rule | The final answer explicitly says the information could not be found. |
+| `policy` | rule | A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, or call budget. |
 | `wrong_direction` | judge | On a multi-hop task, the agent walked the dependency chain backwards. |
 
 A **rule** is plain code over the trace structure: instant, deterministic, no model. A **judge** check is a yes/no question a model answers from the rendered trace; it only runs when you pass `--judge`. Both kinds are calibrated the same way, below.
+
+### Policy: what was the agent allowed to do?
+
+```json
+{"allow": ["search", "lookup", "calc"], "max_calls": 10, "max_arg_chars": 200}
+```
+
+`faultgate check traces.json --policy policy.json` then flags every step that called a tool outside `allow`, passed an argument matching a denied pattern (path traversal, `file://`, `/etc/passwd`, `~/.ssh` out of the box), exceeded `max_arg_chars`, or pushed the run past `max_calls` — with the step number in the reason. It is FAULTLINE P16's runtime policy applied after the fact: the four structural injection categories from P9 (`tool_exfil_path`, `unlisted_tool`, `query_dump`, `budget_loop`) are each caught by a test in `tests/test_policy.py`. Without a policy file only the denied-pattern rule is active, and it fires on 0 of the 290 real traces shipped here.
+
+Semantic injections — the agent *obeying* text it read in a document — are a judge question, not a rule, and are not in this release.
 
 ## Regression or noise? Tolerance bands
 
@@ -104,6 +116,7 @@ This is the part every evaluation tool skips. Every check and judge here is scor
 |---|---|---|---|---|---|---|
 | `search_loop` | rule | 36 | 1.00 | 0.99 | **0.98** | **1.00** |
 | `abstention` | rule | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
+| `policy` | rule | synthetic | 4/4 P9 categories | 0 FP on 290 real traces | — | — |
 | `wrong_direction` | Laya judge | 1 | 1.00 | 0.61 | 0.02 | 0.00 |
 
 For comparison, the same `search_loop` question put to judges instead of a rule: Laya κ 0.09, GLM-5.3 (API) κ −0.03. **Where a failure is structural, code beats every model we measured**, which is why the default checks are rules.
@@ -111,6 +124,7 @@ For comparison, the same `search_loop` question put to judges instead of a rule:
 Read the table honestly:
 - `search_loop` is solid on this task family. The human coder saw the same structural signals, so κ measures agreement with that coding, not ground truth from nowhere.
 - `abstention` has one positive to learn from. The rule is a phrase list; a paraphrase it doesn't know is a miss.
+- `policy` has no human-labelled positives: FAULTLINE's agent rejects hostile calls before they become steps, so its traces never contain an executed attack. Recall is by construction on the P9 attack shapes; the number that matters is zero false positives on real runs.
 - `wrong_direction` is the only check that needs reading, and the only local judge we have is noise on it (fires on 39% of clean runs). It ships because the contract is the product: the day a local model scores κ ≥ 0.7 on it, that's a one-line adapter, and this harness is what proves it.
 - Laya's context is 512 tokens. `faultgate` compacts the trace to fit (answer and termination first, middle steps elided) and counts every call that still overflows; the count is printed.
 
@@ -130,7 +144,7 @@ class Judge(Protocol):
 ## What it doesn't do yet
 
 - **Golden answers.** `--golden` unlocks two more P5 checks (answer truncation, premature stop).
-- **Policy and injection checks.** FAULTLINE P9/P16 have the taxonomy; not wired in.
+- **Semantic injection checks** (the agent obeyed text it read). P9 has the taxonomy; needs a judge that scores.
 - **A GitHub Action.** Rules-only runs need nothing but Python, so this is close.
 - **Running your agent.** `faultgate` reads traces; it never executes anything.
 
