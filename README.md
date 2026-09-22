@@ -1,23 +1,23 @@
 # faultgate
 
-**A local-first release gate for AI agents.** Hand it the traces your agent recorded, it runs each one through a set of failure checks with a pluggable judge, and exits non-zero if the agent isn't safe to ship. Free, offline after one download, no API key required.
+**A local-first release gate for AI agents.** Hand it the traces your agent recorded, it checks every run for known failure modes, measures your run-to-run noise, and exits non-zero only when a candidate is a real regression. Free, offline, no model required for the default checks.
 
 ```
 $ faultgate check examples/traces.json
-trace         search_loop       abstention        wrong_direction
-------------------------------------------------------------------
-fc2cdab304bd  FAIL 0.76         ok   0.63         FAIL 0.52
-6d1f9d67a2d4  ok   0.51         FAIL 0.58         ok   0.63
-8bf3879339eb  ok   0.67         ok   0.62         ok   0.76
-3a9e507a0f6d  FAIL 0.81         FAIL 0.76         FAIL 0.61
-2ab3b6c1e891  FAIL 0.56         ok   0.62         ok   0.73
+trace         search_loop       abstention
+------------------------------------------------
+fc2cdab304bd  FAIL 1.00         ok   1.00
+6d1f9d67a2d4  ok   1.00         FAIL 1.00
+8bf3879339eb  ok   1.00         ok   1.00
+3a9e507a0f6d  ok   1.00         ok   1.00
+2ab3b6c1e891  ok   1.00         ok   1.00
 
-4/5 traces failed · search_loop=3, abstention=2, wrong_direction=2 · judge laya · 55.5s
+2/5 traces failed · search_loop=1, abstention=1 · judge none · 0.0s
 $ echo $?
 1
 ```
 
-Real output, unedited, on five real agent runs (`openai/gpt-5.6-luna` on a multi-hop retrieval task, recorded by [FAULTLINE](https://github.com/samirsawarkar/faultline-ai-reliability)). Trace 1 genuinely looped for 12 steps; trace 2 genuinely abstained; trace 3 is a clean 2-step success. Trace 4 is a 9-step success that the judge over-flags — see [How much to trust a verdict](#how-much-to-trust-a-verdict) before you wire this into CI.
+Real output, unedited, on five real agent runs (`openai/gpt-5.6-luna` on a multi-hop retrieval task, recorded by [FAULTLINE](https://github.com/samirsawarkar/faultline-ai-reliability)). Trace 1 looped for 12 steps and never answered; trace 2 said it couldn't find the answer; 3–5 answered.
 
 ## Install
 
@@ -25,20 +25,23 @@ Real output, unedited, on five real agent runs (`openai/gpt-5.6-luna` on a multi
 pip install faultgate
 ```
 
-The first `check` downloads the default judge, [Laya](https://huggingface.co/convaiinnovations/laya) (~800 MB, Apache-2.0), pinned to the revision we calibrated. After that it runs fully offline on CPU or Apple Silicon. Torch comes with it, so it's a developer-machine install, not a slim CI image — see [What it doesn't do yet](#what-it-doesnt-do-yet).
+The built-in checks are code — nothing to download. Enabling a judge (`--judge laya`) downloads [Laya](https://huggingface.co/convaiinnovations/laya) once (~800 MB, Apache-2.0, pinned revision) and runs offline after that. Read [How much to trust a verdict](#how-much-to-trust-a-verdict) before you enable one.
 
 ## Usage
 
 ```bash
-faultgate check traces.json                          # all checks, Laya judge
-faultgate check traces.json --check search_loop,abstention
+faultgate check traces.json                          # built-in rule checks
 faultgate check traces.json --json report.json       # full per-trace verdicts
+faultgate check traces.json --judge laya             # also run judge checks, locally
 faultgate check traces.json --judge litellm:openai/gpt-5.6-luna   # any API model
-faultgate checks                                     # list checks
+faultgate checks                                     # list checks and their kind
 faultgate judges                                     # list judge specs
+
+faultgate baseline run1.json run2.json --out band.json   # measure your noise (>= 2 runs)
+faultgate check candidate.json --band band.json          # regression, or just noise?
 ```
 
-Exit codes: `0` clean · `1` at least one check fired · `2` bad input.
+Exit codes: `0` clean · `1` at least one check fired (or, with `--band`, gate FAIL) · `2` bad input.
 
 ### Input format
 
@@ -46,63 +49,93 @@ An [OTLP/JSON](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)
 
 | Span | Attributes read |
 |---|---|
-| root `invoke_agent` | `gen_ai.agent.name`, `gen_ai.input.messages` (the user prompt), `gen_ai.output.messages` (the final answer) |
+| root `invoke_agent` | `gen_ai.agent.name`, `gen_ai.input.messages` (the user prompt), `gen_ai.output.messages` (the final answer), optional `faultgate.termination` (why the run stopped, e.g. `step cap`) |
 | child `execute_tool` | `gen_ai.tool.name`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
 
-Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you: the judge is then grading an empty page. [`examples/traces.json`](examples/traces.json) is a complete reference file.
+Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](examples/traces.json) is a complete reference file.
 
 ## Checks
 
-| Check | Fires when |
-|---|---|
-| `search_loop` | The agent issued over-constrained queries that returned nothing and kept reformulating until it ran out of steps. |
-| `abstention` | The agent explicitly said it could not find the information instead of answering. |
-| `wrong_direction` | On a multi-hop task, the agent walked the dependency chain backwards. |
+| Check | Kind | Fires when |
+|---|---|---|
+| `search_loop` | rule | The run ended with no answer at its step budget and most tool calls returned nothing. |
+| `abstention` | rule | The final answer explicitly says the information could not be found. |
+| `wrong_direction` | judge | On a multi-hop task, the agent walked the dependency chain backwards. |
 
-Each check is one yes/no question. The rule text comes from FAULTLINE project P5, where it was scored against human-labelled failure modes. Two more P5 modes (answer truncation, premature stop) need an expected answer and are not here yet.
+A **rule** is plain code over the trace structure: instant, deterministic, no model. A **judge** check is a yes/no question a model answers from the rendered trace; it only runs when you pass `--judge`. Both kinds are calibrated the same way, below.
+
+## Regression or noise? Tolerance bands
+
+Agents are not deterministic. FAULTLINE P11 ran the same model on the same 30 inputs five times and got pass rates from 0.60 to 0.87. A fixed threshold turns that into a coin-flip gate. `faultgate` measures your spread instead:
+
+```
+$ faultgate baseline examples/gate/baseline_glm_run1.json examples/gate/baseline_glm_run2.json --out band.json
+examples/gate/baseline_glm_run1.json: 30 traces · clean rate 0.93 · 0.0s
+examples/gate/baseline_glm_run2.json: 30 traces · clean rate 0.93 · 0.0s
+band [0.93, 0.93] over 30 scenarios × 2 runs · 26 clean in every run · written to band.json
+
+$ faultgate check examples/gate/candidate_gpt.json --band band.json
+18/30 traces failed · search_loop=18, abstention=0 · judge none · 0.0s
+gate: FAIL · clean rate 0.40 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+regressions (clean in every baseline, not now): r-0208, r-0214, r-0216, r-0224, r-0226, r-0232, r-0258, ...
+
+$ faultgate check examples/gate/candidate_qwen.json --band band.json
+gate: FAIL · clean rate 0.70 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+
+$ faultgate check examples/gate/baseline_glm_run2.json --band band.json
+gate: PASS · clean rate 0.93 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+```
+
+Real runs: two `z-ai/glm-5.3-flash` baselines and `openai/gpt-5.6-luna` / `qwen/qwen3.7-flash` candidates on the same 30 multi-hop scenarios. The verdicts match FAULTLINE P11's live drill (R4 FAIL / R1 FAIL / R2 PASS), which cost $1.84 and an API judge; this took 0.0 s and no model.
+
+| Verdict | Rule (n = scenarios in the band) | Exit |
+|---|---|---|
+| **PASS** | clean rate ≥ min observed − 1/n | 0 |
+| **WARN** | in between — a human should look | 0 |
+| **FAIL** | clean rate < min observed − 3/n | 1 |
+
+It also lists **regressions**: scenarios clean in *every* baseline run and not clean now — the ones to read first. Scenarios are matched across runs by `faultgate.scenario`, else `gen_ai.agent.id`, else a hash of the prompt.
 
 ## How much to trust a verdict
 
-This is the part every evaluation tool skips. Every judge here was measured against **human labels** on a frozen, content-addressed test split (n = 60 agent runs) in FAULTLINE P5. Cohen's κ, sensitivity (TPR) and specificity (TNR) per check, for the default judge:
+This is the part every evaluation tool skips. Every check and judge here is scored against **human failure-mode labels** on 200 real agent runs (FAULTLINE P4), reported on all 200 and on P5's frozen test split (n = 60). Regenerate with `scripts/calibrate.py`.
 
-| Check | Positives in split | Laya TPR | Laya TNR | Laya κ | GLM-5.3 κ (API judge) |
-|---|---|---|---|---|---|
-| `search_loop` | 14 | 1.00 | 0.37 | **0.21** | −0.03 |
-| `abstention` | 0 | — | 0.93 | 0.00 | 1.00* |
-| `wrong_direction` | 0 | — | 0.52 | 0.00 | 1.00* |
+| Check | Kind | Positives | TPR | TNR | κ (n=200) | κ (P5 test, n=60) |
+|---|---|---|---|---|---|---|
+| `search_loop` | rule | 36 | 1.00 | 0.99 | **0.98** | **1.00** |
+| `abstention` | rule | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
+| `wrong_direction` | Laya judge | 1 | 1.00 | 0.61 | 0.02 | 0.00 |
 
-\* degenerate: zero positives, the API judge said "no" to everything.
+For comparison, the same `search_loop` question put to judges instead of a rule: Laya κ 0.09, GLM-5.3 (API) κ −0.03. **Where a failure is structural, code beats every model we measured**, which is why the default checks are rules.
 
-Read it honestly: on the one check with real signal, Laya caught **14 of 14** loops the API judge missed entirely — and flagged 29 innocents with them. It is a **high-recall, low-precision** judge. Use it as a first pass that surfaces traces for a human or a stronger judge, not as the sole vote on a release. The test split has positives on only one check, so the other two rows are a specificity number, not a verdict on the check.
+Read the table honestly:
+- `search_loop` is solid on this task family. The human coder saw the same structural signals, so κ measures agreement with that coding, not ground truth from nowhere.
+- `abstention` has one positive to learn from. The rule is a phrase list; a paraphrase it doesn't know is a miss.
+- `wrong_direction` is the only check that needs reading, and the only local judge we have is noise on it (fires on 39% of clean runs). It ships because the contract is the product: the day a local model scores κ ≥ 0.7 on it, that's a one-line adapter, and this harness is what proves it.
+- Laya's context is 512 tokens. `faultgate` compacts the trace to fit (answer and termination first, middle steps elided) and counts every call that still overflows; the count is printed.
 
-Two more caveats measured on this machine:
-- Laya's context is 512 tokens. Long traces are truncated and `faultgate` tells you how many (`3/15` in the demo above). Verdicts on truncated traces saw only the opening steps.
-- Laya itself warns at load that this checkpoint ships out-of-range temperatures and clamps them; treat its confidence column as a ranking, not a probability.
-
-Full numbers, confusion matrices and Wilson CIs: [FAULTLINE `projects/p05_judge/DECISIONS.md`](https://github.com/samirsawarkar/faultline-ai-reliability/blob/main/projects/p05_judge/DECISIONS.md).
+Full confusion matrices and Wilson CIs for the original P5 judges: [FAULTLINE `projects/p05_judge/DECISIONS.md`](https://github.com/samirsawarkar/faultline-ai-reliability/blob/main/projects/p05_judge/DECISIONS.md).
 
 ## Swap the judge
-
-The judge is a four-line contract:
 
 ```python
 class Judge(Protocol):
     name: str
+    budget: int | None          # max characters of trace it can read
     def ask(self, state: str, question: str) -> Verdict: ...   # Verdict(detected, confidence, reason)
 ```
 
-`laya` and `litellm:<model>` ship in the box. When a better local model lands, it's a new adapter, and P5 is the harness that tells you whether it's actually better on your failure modes before you trust it.
+`laya` and `litellm:<model>` ship in the box. Add a judge, run `scripts/calibrate.py --judge yours`, and publish the row.
 
 ## What it doesn't do yet
 
-- **Tolerance bands.** A pass rate of 0.72 might be inside your model's run-to-run noise (FAULTLINE P11 measured 0.60–0.87 on identical inputs). v1 gates on a band measured from repeated runs, not a threshold.
-- **Golden answers.** `--golden` unlocks the truncation and premature-stop checks.
-- **Policy and injection checks.** FAULTLINE P9/P16 have the taxonomy; they're not wired in.
-- **A CI action** with cached weights. Today's install is too heavy for a cold CI runner.
+- **Golden answers.** `--golden` unlocks two more P5 checks (answer truncation, premature stop).
+- **Policy and injection checks.** FAULTLINE P9/P16 have the taxonomy; not wired in.
+- **A GitHub Action.** Rules-only runs need nothing but Python, so this is close.
 - **Running your agent.** `faultgate` reads traces; it never executes anything.
 
 ## Built on FAULTLINE
 
-[FAULTLINE](https://github.com/samirsawarkar/faultline-ai-reliability) is the research workbench behind this tool: 30 days of simulator, 16 measured projects, two papers. `faultgate` is the part you install. Every number in this README links back to the project that produced it.
+[FAULTLINE](https://github.com/samirsawarkar/faultline-ai-reliability) is the research workbench behind this tool: 30 days of simulator, 16 measured projects, two papers. `faultgate` is the part you install. Every number in this README links back to the run that produced it.
 
 MIT © 2026 Samir Sawarkar

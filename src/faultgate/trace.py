@@ -9,6 +9,7 @@ is still loaded — the judge just sees structure only.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,16 @@ class Trace(BaseModel):
         return _text(r.attrs.get("gen_ai.output.messages"), role="assistant") or str(r.attrs.get("gen_ai.completion", ""))
 
     @property
+    def key(self) -> str:
+        """Stable scenario key across runs: faultgate.scenario, else gen_ai.agent.id, else a prompt hash."""
+        r = self.root
+        if r:
+            for k in ("faultgate.scenario", "gen_ai.agent.id"):
+                if r.attrs.get(k):
+                    return str(r.attrs[k])
+        return "p-" + hashlib.sha256(self.prompt.encode("utf-8")).hexdigest()[:12]
+
+    @property
     def termination(self) -> str:
         r = self.root
         return str(r.attrs.get("faultgate.termination", "")) if r else ""
@@ -83,16 +94,41 @@ class Trace(BaseModel):
     def has_content(self) -> bool:
         return bool(self.prompt or self.answer or any(st.arguments or st.result for st in self.steps))
 
-    def render(self) -> str:
-        """The state text a judge reads. Mirrors FAULTLINE P5's trace_context."""
+    def render(self, budget: int | None = None) -> str:
+        """The state text a judge reads.
+
+        Diagnostic facts first (answer, termination, step count), then the steps.
+        With a character ``budget`` (small local judges have a 512-token window),
+        steps are compacted and the middle is elided — the first two and the last
+        ones survive, because loops are visible at the tail and setup at the head.
+        """
         steps = self.steps
-        lines = [f"Agent: {self.agent}", f"Prompt: {self.prompt}", f"Steps used: {len(steps)}"]
-        if self.termination:
-            lines.append(f"Termination: {self.termination}")
-        for st in steps:
-            lines.append(f"Step {st.index}: {st.tool} {st.arguments} -> {st.result}")
-        lines.append(f"Final answer: {self.answer}")
-        return "\n".join(lines)
+        head = [
+            f"Agent: {self.agent}",
+            f"Prompt: {_trim(self.prompt, 600 if budget else None)}",
+            f"Steps used: {len(steps)}",
+            f"Termination: {self.termination or 'unknown'}",
+            f"Final answer: {_trim(self.answer, 400 if budget else None) or '(none)'}",
+        ]
+        lines = [f"Step {st.index}: {st.tool} {_trim(st.arguments, 160 if budget else None)} -> {_trim(st.result, 160 if budget else None)}" for st in steps]
+        if budget is None:
+            return "\n".join(head + lines)
+        room = budget - sum(len(h) + 1 for h in head)
+        keep_head = lines[:2]
+        room -= sum(len(x) + 1 for x in keep_head)
+        tail: list[str] = []
+        for line in reversed(lines[2:]):
+            if room - len(line) - 1 < 24:  # leave space for the elision marker
+                break
+            tail.insert(0, line)
+            room -= len(line) + 1
+        omitted = len(lines) - len(keep_head) - len(tail)
+        middle = [f"... {omitted} steps omitted ..."] if omitted > 0 else []
+        return "\n".join(head + keep_head + middle + tail)
+
+
+def _trim(s: str, n: int | None) -> str:
+    return s if n is None or len(s) <= n else s[: n - 1] + "…"
 
 
 def _text(messages: Any, role: str) -> str:

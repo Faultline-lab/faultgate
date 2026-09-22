@@ -9,6 +9,7 @@ class FakeJudge:
     """Fires when the question's keyword appears in the state. No model, no network."""
 
     name = "fake"
+    budget = None
 
     def __init__(self, fire_on: dict[str, str] | None = None):
         self.fire_on = fire_on or {}
@@ -18,9 +19,11 @@ class FakeJudge:
         from faultgate.judge import Verdict
 
         self.calls.append((state, question))
-        for key, needle in self.fire_on.items():
-            if key in question and needle in state:
-                return Verdict(True, 0.9, f"fake: saw {needle!r}")
+        for key, needles in self.fire_on.items():
+            needles = [needles] if isinstance(needles, str) else needles
+            for needle in needles:
+                if key in question and needle in state:
+                    return Verdict(True, 0.9, f"fake: saw {needle!r}")
         return Verdict(False, 0.1, "fake: clean")
 
 

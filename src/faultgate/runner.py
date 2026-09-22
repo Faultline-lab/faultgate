@@ -11,6 +11,7 @@ from faultgate.trace import Trace
 @dataclass(frozen=True)
 class Result:
     trace_id: str
+    scenario: str
     check: str
     verdict: Verdict
 
@@ -27,6 +28,15 @@ class Report:
         for r in self.results:
             seen.setdefault(r.trace_id)
         return list(seen)
+
+    @property
+    def scenario_of(self) -> dict[str, str]:
+        return {r.trace_id: r.scenario for r in self.results}
+
+    @property
+    def clean_by_scenario(self) -> dict[str, bool]:
+        """scenario key -> True if no check fired on that trace."""
+        return {self.scenario_of[t]: t not in self.failed_traces for t in self.trace_ids}
 
     @property
     def failed_traces(self) -> list[str]:
@@ -55,17 +65,24 @@ class Report:
             "failed_traces": self.failed_traces,
             "fired": self.fired,
             "results": [
-                {"trace_id": r.trace_id, "check": r.check, "detected": r.verdict.detected,
+                {"trace_id": r.trace_id, "scenario": r.scenario, "check": r.check, "detected": r.verdict.detected,
                  "confidence": round(r.verdict.confidence, 4), "reason": r.verdict.reason}
                 for r in self.results
             ],
         }
 
 
-def run(traces: list[Trace], checks: list[Check], judge: Judge) -> Report:
-    report = Report(judge=judge.name, checks=[c.name for c in checks])
+def run(traces: list[Trace], checks: list[Check], judge: Judge | None = None) -> Report:
+    """Rules always run. Judge checks run only when a judge is given; otherwise they are dropped from the report."""
+    active = [c for c in checks if c.rule or judge is not None]
+    report = Report(judge=judge.name if judge else "none", checks=[c.name for c in active])
     for t in traces:
-        state = t.render()
-        for c in checks:
-            report.results.append(Result(t.trace_id, c.name, judge.ask(state, c.question)))
+        state = None
+        for c in active:
+            if c.rule:
+                v = c.rule(t)
+            else:
+                state = state if state is not None else t.render(getattr(judge, "budget", None))
+                v = judge.ask(state, c.question)
+            report.results.append(Result(t.trace_id, t.key, c.name, v))
     return report

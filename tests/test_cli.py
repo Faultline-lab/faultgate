@@ -8,21 +8,29 @@ from tests.conftest import EXAMPLES, FakeJudge
 
 @pytest.fixture
 def patched(monkeypatch):
-    judge = FakeJudge(fire_on={"ABSTENTION": "couldn’t verify"})
+    judge = FakeJudge(fire_on={"DIRECTION": "couldn’t verify"})
     monkeypatch.setattr(cli, "get_judge", lambda spec: judge)
     return judge
 
 
 def test_exit_1_when_fired(patched, capsys, tmp_path):
     out = tmp_path / "r.json"
-    assert cli.main(["check", str(EXAMPLES), "--json", str(out)]) == 1
+    assert cli.main(["check", str(EXAMPLES), "--judge", "fake", "--json", str(out)]) == 1
     text = capsys.readouterr().out
-    assert "1/5 traces failed" in text and "FAIL" in text
-    assert json.loads(out.read_text())["fired"]["abstention"] == 1
+    assert "2/5 traces failed" in text and "FAIL" in text  # rule catches the loop, fake judge the abstention
+    assert json.loads(out.read_text())["fired"] == {"search_loop": 1, "abstention": 1, "wrong_direction": 1}
 
 
-def test_exit_0_when_clean(patched):
-    assert cli.main(["check", str(EXAMPLES), "--check", "search_loop"]) == 0
+def test_exit_0_when_clean(monkeypatch):
+    monkeypatch.setattr(cli, "get_judge", lambda spec: FakeJudge())
+    assert cli.main(["check", str(EXAMPLES), "--check", "wrong_direction", "--judge", "fake"]) == 0
+
+
+def test_rules_only_by_default(capsys):
+    assert cli.main(["check", str(EXAMPLES)]) == 1  # loop + abstention rules fire; no model loaded
+    err = capsys.readouterr().err
+    assert "wrong_direction skipped" in err
+    assert cli.main(["check", str(EXAMPLES), "--check", "wrong_direction"]) == 2  # nothing runnable without a judge
 
 
 def test_exit_2_on_bad_input(patched, capsys):

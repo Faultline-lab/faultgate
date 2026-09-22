@@ -22,7 +22,7 @@ def test_render_shape():
     assert text.startswith("Agent: faultline-agent\nPrompt: ")
     assert "Steps used: 2" in text  # 3 P03 steps, 2 of them tool calls
     assert "Step 1: search {" in text
-    assert text.rstrip().endswith("Zinc-4524**.")
+    assert "Final answer: The internal codename of Girona Foundry is **Zinc-4524**." in text
 
 
 def test_structure_only_trace(tmp_path):
@@ -52,3 +52,18 @@ def test_legacy_prompt_attrs(tmp_path):
     p.write_text(json.dumps(doc))
     (t,) = load_otlp(p)
     assert t.prompt == "who?" and t.answer == "him"
+
+
+def test_render_budget_keeps_answer_and_tail():
+    t = load_otlp(EXAMPLES.parent / "gate" / "baseline_glm_run1.json")[0]  # 24 steps, ~4.7k chars
+    full, small = t.render(), t.render(1800)
+    assert len(full) > 4000 and len(small) <= 1800
+    assert "Final answer:" in small.split("\nStep 1: search")[0]  # answer is in the header, before any step
+    assert "steps omitted" in small
+    assert "Step 24:" in small and "Step 1:" in small and "Step 2:" in small
+    assert "Step 12:" not in small
+
+
+def test_render_budget_noop_when_it_fits():
+    t = load_otlp(EXAMPLES)[2]
+    assert "omitted" not in t.render(1800) and t.render(1800).count("Step ") == 2

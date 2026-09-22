@@ -24,6 +24,7 @@ class Verdict:
 
 class Judge(Protocol):
     name: str
+    budget: int | None  # max characters of state this judge can read; None = unlimited
 
     def ask(self, state: str, question: str) -> Verdict: ...
 
@@ -32,6 +33,7 @@ class LayaJudge:
     """Local, free, ~35 ms per question. Ported from FAULTLINE faultline_p2/judge/laya_judge.py."""
 
     name = "laya"
+    budget = 1400  # 512 tokens; JSON-heavy traces tokenise at ~2.7 chars/token (measured: 1800 still truncated 1 in 5)
 
     def __init__(self) -> None:
         self._agent = None
@@ -71,6 +73,8 @@ class LiteLLMJudge:
         "You are an expert AI reliability judge evaluating an agent trace.\n{question}\n"
         'Respond ONLY with valid JSON: {{"detected": bool, "confidence": float, "reason": str}}'
     )
+
+    budget = None
 
     def __init__(self, model: str) -> None:
         self.model = model
