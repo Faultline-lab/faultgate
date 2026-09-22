@@ -25,7 +25,7 @@ Real output, unedited, on five real agent runs (`openai/gpt-5.6-luna` on a multi
 pip install faultgate
 ```
 
-One dependency (pydantic). The built-in checks are code — nothing to download. Judges are extras:
+Requires Python 3.11 or newer. One dependency (pydantic). The built-in checks are code — nothing to download. Judges are extras:
 
 ```bash
 pip install 'faultgate[laya]'   # local judge: downloads Laya once (~800 MB, Apache-2.0, pinned revision), offline after
@@ -61,7 +61,7 @@ An [OTLP/JSON](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)
 | root `invoke_agent` | `gen_ai.agent.name`, `gen_ai.input.messages` (the user prompt), `gen_ai.output.messages` (the final answer), optional `faultgate.termination` (why the run stopped, e.g. `step cap`) |
 | child `execute_tool` | `gen_ai.tool.name`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
 
-Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](examples/traces.json) is a complete reference file.
+Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](https://github.com/samirsawarkar/faultgate/blob/main/examples/traces.json) is a complete reference file.
 
 ## Checks
 
