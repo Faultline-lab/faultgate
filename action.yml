@@ -1,0 +1,28 @@
+name: faultgate
+description: Gate a deploy on recorded agent traces — rule checks, optional band, golden answers and policy. Exit 1 on FAIL.
+branding: { icon: shield, color: red }
+inputs:
+  traces:  { description: "OTLP/JSON trace export to check", required: true }
+  band:    { description: "band.json from `faultgate baseline` (FAIL only outside the measured band)", required: false, default: "" }
+  golden:  { description: "golden.json of expected answers", required: false, default: "" }
+  policy:  { description: "policy.json of allowed tools / patterns / budgets", required: false, default: "" }
+  checks:  { description: "comma-separated subset of checks", required: false, default: "" }
+  judge:   { description: "laya or litellm:<model>; needs the [laya] / [api] extra installed", required: false, default: "" }
+  report:  { description: "path to write the JSON report", required: false, default: "faultgate-report.json" }
+  version: { description: "faultgate version spec, or a path/VCS spec for pip", required: false, default: "faultgate" }
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with: { python-version: "3.12" }
+    - shell: bash
+      run: pip install --quiet "${{ inputs.version }}"
+    - shell: bash
+      run: |
+        args=(check "${{ inputs.traces }}" --json "${{ inputs.report }}")
+        [ -n "${{ inputs.band }}" ]   && args+=(--band "${{ inputs.band }}")
+        [ -n "${{ inputs.golden }}" ] && args+=(--golden "${{ inputs.golden }}")
+        [ -n "${{ inputs.policy }}" ] && args+=(--policy "${{ inputs.policy }}")
+        [ -n "${{ inputs.checks }}" ] && args+=(--check "${{ inputs.checks }}")
+        [ -n "${{ inputs.judge }}" ]  && args+=(--judge "${{ inputs.judge }}")
+        faultgate "${args[@]}"

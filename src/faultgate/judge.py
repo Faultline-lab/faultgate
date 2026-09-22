@@ -45,7 +45,10 @@ class LayaJudge:
         if self._agent is None:
             with self._lock:
                 if self._agent is None:
-                    import laya  # heavy import, deferred
+                    try:
+                        import laya  # heavy import, deferred
+                    except ImportError as e:
+                        raise ValueError("the laya judge needs `pip install faultgate[laya]`") from e
                     from huggingface_hub import snapshot_download
 
                     # laya.load has no revision arg; resolve the pinned snapshot ourselves
@@ -115,6 +118,6 @@ def get_judge(spec: str) -> Judge:
 
 
 JUDGE_SPECS = {
-    "laya": "local decision model, free, offline after the first ~800 MB download (default)",
+    "laya": "local decision model, free, offline after the first ~800 MB download (pip install faultgate[laya])",
     "litellm:<model>": "any API model via litellm, e.g. litellm:openai/gpt-5.6-luna (needs faultgate[api] and the provider's API key)",
 }

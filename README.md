@@ -25,7 +25,14 @@ Real output, unedited, on five real agent runs (`openai/gpt-5.6-luna` on a multi
 pip install faultgate
 ```
 
-The built-in checks are code — nothing to download. Enabling a judge (`--judge laya`) downloads [Laya](https://huggingface.co/convaiinnovations/laya) once (~800 MB, Apache-2.0, pinned revision) and runs offline after that. Read [How much to trust a verdict](#how-much-to-trust-a-verdict) before you enable one.
+One dependency (pydantic). The built-in checks are code — nothing to download. Judges are extras:
+
+```bash
+pip install 'faultgate[laya]'   # local judge: downloads Laya once (~800 MB, Apache-2.0, pinned revision), offline after
+pip install 'faultgate[api]'    # any API model through litellm
+```
+
+Read [How much to trust a verdict](#how-much-to-trust-a-verdict) before you enable a judge.
 
 ## Usage
 
@@ -130,6 +137,19 @@ gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail 
 
 (Qwen returns the head of the answer token without its suffix in 8 of 30 runs. Nobody had noticed.)
 
+## In CI
+
+```yaml
+- uses: samirsawarkar/faultgate@main
+  with:
+    traces: traces/candidate.json      # exported by your agent's OTel pipeline
+    band: traces/band.json             # from `faultgate baseline`, committed
+    golden: traces/golden.json         # optional
+    policy: traces/policy.json         # optional
+```
+
+Exit 1 on gate FAIL, so the job fails; WARN and PASS pass. The report lands in `faultgate-report.json` for upload as an artifact. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes.
+
 ## How much to trust a verdict
 
 This is the part every evaluation tool skips. Every check and judge here is scored against **human failure-mode labels** on 200 real agent runs (FAULTLINE P4), reported on all 200 and on P5's frozen test split (n = 60). Regenerate with `scripts/calibrate.py`.
@@ -170,7 +190,6 @@ class Judge(Protocol):
 
 - **Premature stop** (answered with an intermediate entity of the chain). Needs the traversal chain, not just the final answer.
 - **Semantic injection checks** (the agent obeyed text it read). P9 has the taxonomy; needs a judge that scores.
-- **A GitHub Action.** Rules-only runs need nothing but Python, so this is close.
 - **Running your agent.** `faultgate` reads traces; it never executes anything.
 
 ## Built on FAULTLINE

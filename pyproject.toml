@@ -19,9 +19,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Testing",
 ]
-dependencies = ["pydantic>=2", "laya>=0.3.5"]
+dependencies = ["pydantic>=2"]
 
 [project.optional-dependencies]
+laya = ["laya>=0.3.5"]
 api = ["litellm>=1.70"]
 dev = ["pytest>=8"]
 

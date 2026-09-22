@@ -13,3 +13,25 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: pip install -e '.[api,dev]'
       - run: python -m pytest   # no model weights are downloaded by the suite
+
+  action:
+    # the composite action, run against this checkout: a regressing candidate must FAIL, a baseline must PASS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: regression
+        uses: ./
+        continue-on-error: true
+        with:
+          version: .
+          traces: examples/gate/candidate_gpt.json
+          band: examples/gate/band.json
+          golden: examples/gate/golden.json
+      - id: baseline
+        uses: ./
+        with:
+          version: .
+          traces: examples/gate/baseline_glm_run2.json
+          band: examples/gate/band.json
+          golden: examples/gate/golden.json
+      - run: test "${{ steps.regression.outcome }}" = failure && test "${{ steps.baseline.outcome }}" = success

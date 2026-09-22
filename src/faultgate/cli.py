@@ -76,7 +76,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         judge = _judge_or_none(args, checks)
         band = json.loads(Path(args.band).read_text(encoding="utf-8")) if args.band else None
         report, elapsed = _run(args.traces, checks, judge)
-    except (ValueError, KeyError, OSError) as e:
+    except (ValueError, KeyError, OSError, ImportError) as e:
         print(f"faultgate: {e}", file=sys.stderr)
         return 2
 
