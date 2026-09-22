@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "faultgate"
+version = "0.1.0"
+description = "Local-first release gate for AI agents: check recorded traces for known failure modes through a pluggable judge."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Samir Sawarkar" }]
+keywords = ["ai", "agents", "evaluation", "reliability", "opentelemetry", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = ["pydantic>=2", "laya>=0.3.5"]
+
+[project.optional-dependencies]
+api = ["litellm>=1.70"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+faultgate = "faultgate.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/samirsawarkar/faultgate"
+Evidence = "https://github.com/samirsawarkar/faultline-ai-reliability"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

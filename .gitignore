@@ -1,0 +1,10 @@
+PLAN.md
+CLAUDE.md
+.aes/started*
+.DS_Store
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+build/
+dist/

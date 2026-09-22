@@ -1,0 +1,37 @@
+#!/bin/bash
+# AES: hand one step to the worker agent (Antigravity) and block until it reports.
+set -euo pipefail
+
+[ $# -ge 1 ] || { echo 'usage: .aes/delegate "<instructions for the worker>"' >&2; exit 2; }
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+root=$(dirname "$here")
+
+# First call names a project so the conversation shows up in the Antigravity
+# app; later calls resume it.
+# ponytail: --continue resumes agy's most recent conversation, not one keyed to
+# this project. Fine for one loop at a time; thread --conversation <id> if you
+# ever run two workspaces at once.
+if [ -e "$here/started" ]; then
+  resume=(--continue)
+else
+  resume=(--new-project --project "$(basename "$root")")
+  : > "$here/started"
+fi
+
+model=()
+[ -n "${AES_WORKER_MODEL:-}" ] && model=(--model "$AES_WORKER_MODEL")
+
+cd "$root"
+exec agy \
+  --dangerously-skip-permissions \
+  "--add-dir=$root" "--add-dir=/Volumes/SamirDrive/Development/FAULTLINE" \
+  --effort "${AES_WORKER_EFFORT:-high}" \
+  ${model[@]+"${model[@]}"} \
+  ${resume[@]+"${resume[@]}"} \
+  -p="$(cat "$here/worker.md")
+
+---
+
+TASK FROM THE CTO:
+$*"
