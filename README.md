@@ -4,15 +4,15 @@
 
 ```
 $ faultgate check examples/traces.json
-trace         search_loop       abstention
-------------------------------------------------
-fc2cdab304bd  FAIL 1.00         ok   1.00
-6d1f9d67a2d4  ok   1.00         FAIL 1.00
-8bf3879339eb  ok   1.00         ok   1.00
-3a9e507a0f6d  ok   1.00         ok   1.00
-2ab3b6c1e891  ok   1.00         ok   1.00
+trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error
+------------------------------------------------------------------------------------------------------------
+fc2cdab304bd  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+6d1f9d67a2d4  ok   1.00         FAIL 1.00         ok   1.00         ok   1.00         ok   1.00
+8bf3879339eb  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3a9e507a0f6d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+2ab3b6c1e891  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
 
-2/5 traces failed · search_loop=1, abstention=1 · judge none · 0.0s
+2/5 traces failed · search_loop=1, abstention=1, policy=0, repeated_call=0, unrecovered_tool_error=0 · judge none · 0.0s
 $ echo $?
 1
 ```
@@ -63,6 +63,61 @@ An [OTLP/JSON](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)
 
 Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](https://github.com/samirsawarkar/faultgate/blob/main/examples/traces.json) is a complete reference file.
 
+## Measured on real agent traces
+
+faultgate reads chat-only OpenTelemetry GenAI traces where tool calls live inside messages (as exported by many agent harnesses), in addition to `execute_tool` spans.
+
+Run `make demo-real` (first run downloads ~220 MB, ~1 min) to fetch and evaluate 30 real traces (5 per benchmark from `Exgentic/agent-llm-traces-v2`: AppWorld, BrowseComp-Plus, SWE-bench, tau2 airline, tau2 retail, and tau2 telecom):
+
+```
+$ faultgate check .demo/real_traces.json
+trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error
+------------------------------------------------------------------------------------------------------------
+8a224e8eacdd  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3cf53cafee61  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+0ff67ea879fc  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
+0f2709401932  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+a182fd9c1858  ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+9bf471687b5f  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+16b13ee29724  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+9dc71e9167b0  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
+3524b4b6ef7e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
+9ca4051344ef  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
+56e646e603b2  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+f406d07bd94c  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+012e74b002d9  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+f0cd792c3105  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+7c69e4d47302  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+fadbf538c24a  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+8e611f21829d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
+70722761fb7a  FAIL 1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+4ab9ef2c7e60  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+910a177350e2  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+a585b61b1598  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3d7d24721847  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
+4422dd26b177  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+bff8bb4c1b2e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+e42782af7315  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+53fdb0601422  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+1dff5fc97b54  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+88733a4ec841  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+dc97bf8af1d8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+192bf8092eb8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+
+9/30 traces failed · search_loop=2, abstention=0, policy=0, repeated_call=2, unrecovered_tool_error=6 · judge none · 1.1s
+```
+
+Two new checks with measured trust, ported from [FAULTLINE P18](https://github.com/samirsawarkar/faultline-ai-reliability) (`projects/p18_trace_triage`):
+
+| Check | Kind | Measured trust | Source |
+|---|---|---|---|
+| `repeated_call` | rule | κ 0.95 vs a blind second rater (Claude Opus 5.5) on 97 real runs | FAULTLINE P18 |
+| `unrecovered_tool_error` | rule | Caught 13 of 23 unrecovered errors confirmed by the blind second rater (Claude Opus 5.5) (recall 0.57, κ 0.54); misses plain-text errors and run-ending API failures (faultgate has no check for those yet; read flagged traces manually) | FAULTLINE P18 |
+
+Span error = error.type or OTLP status code 2; P18 measured error.type only.
+
+These are public benchmark traces, not production traffic; the P18 sample was stratified half passed / half failed, so rates are not production failure rates; dataset licence is unstated, so faultgate does not ship or redistribute the traces - the demo downloads them from Hugging Face.
+
 ## Checks
 
 | Check | Kind | Fires when |
@@ -70,6 +125,8 @@ Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your e
 | `search_loop` | rule | The run ended with no answer at its step budget and most tool calls returned nothing. |
 | `abstention` | rule | The final answer explicitly says the information could not be found. |
 | `policy` | rule | A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, or call budget. |
+| `repeated_call` | rule | The same tool was called with identical arguments and returned identical results >= 3 times. |
+| `unrecovered_tool_error` | rule | A tool call produced a structural error with no later successful call of the same tool, or a span errored (error.type or status code 2) and no later span made a successful tool call. |
 | `wrong_answer` | golden | Answered, and the expected answer is not in the final answer. |
 | `truncation` | golden | The answer has the head of the expected token but not the whole token (`Onyx` for `Onyx-4413`). |
 | `wrong_direction` | judge | On a multi-hop task, the agent walked the dependency chain backwards. |

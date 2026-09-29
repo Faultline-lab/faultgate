@@ -19,7 +19,7 @@ from functools import partial
 from pathlib import Path
 
 from faultgate.judge import Verdict
-from faultgate.trace import Trace
+from faultgate.trace import Span, Trace
 
 STEP_CAP_WORDS = ("step cap", "step limit", "max steps", "max_steps", "max iterations", "iteration limit")
 
@@ -178,6 +178,168 @@ def truncation_rule(t: Trace, golden: Golden) -> Verdict:
     return Verdict(False, 1.0, "no truncated form of the expected answer")
 
 
+def normalize_tool_arguments(args: Any) -> str:
+    """Normalize tool arguments into a deterministic canonical string."""
+    if args is None:
+        return "{}"
+    if isinstance(args, str):
+        s = args.strip()
+        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+            try:
+                parsed = json.loads(s)
+                return json.dumps(parsed, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            except Exception:
+                pass
+        return re.sub(r"\s+", " ", s)
+    if isinstance(args, dict):
+        return json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return str(args)
+
+
+def repeated_call_rule(t: Trace) -> Verdict:
+    """FAULTLINE P18: kappa 0.95 vs a blind second rater (Claude Opus 5.5) on 97 real runs (Exgentic, 6 benchmarks)."""
+    steps = t.steps
+    if len(steps) < 3:
+        return Verdict(False, 1.0, "fewer than 3 tool calls")
+
+    calls_by_key: dict[tuple[str, str], list[int]] = {}
+    for idx, st in enumerate(steps):
+        norm_args = normalize_tool_arguments(st.arguments)
+        key = (st.tool, norm_args)
+        calls_by_key.setdefault(key, []).append(idx)
+
+    for (tool_name, norm_args), indices in calls_by_key.items():
+        if len(indices) < 3:
+            continue
+        for i in range(len(indices) - 2):
+            idx1, idx2, idx3 = indices[i], indices[i + 1], indices[i + 2]
+            resp1 = re.sub(r"\s+", " ", steps[idx1].result).strip()
+            resp2 = re.sub(r"\s+", " ", steps[idx2].result).strip()
+            resp3 = re.sub(r"\s+", " ", steps[idx3].result).strip()
+            if resp1 == resp2 == resp3:
+                evidence_step = steps[idx3].index
+                reason = (
+                    f"Tool '{tool_name}' with arguments {norm_args[:60]} issued "
+                    f">= 3 times (steps {steps[idx1].index}, {steps[idx2].index}, {evidence_step}) "
+                    f"where all 3 responses are identical after whitespace normalization."
+                )
+                return Verdict(True, 1.0, reason)
+
+    return Verdict(False, 1.0, "no repeated calls without progress")
+
+
+ERROR_PREFIXES = (
+    "Error:",
+    "ERROR:",
+    "Traceback (most recent call last)",
+    "An error occurred while parsing tool arguments",
+)
+
+
+def _is_structural_error(result: str) -> tuple[bool, str]:
+    """Determine whether a tool result represents a structural error."""
+    s = result.strip()
+    if not s:
+        return False, ""
+
+    candidate_objs: list[dict[str, Any]] = []
+    if s.startswith("{") and s.endswith("}"):
+        try:
+            p = json.loads(s)
+            if isinstance(p, dict):
+                candidate_objs.append(p)
+        except Exception:
+            pass
+    elif s.startswith("[") and s.endswith("]"):
+        try:
+            p = json.loads(s)
+            if isinstance(p, list):
+                for item in p:
+                    if isinstance(item, dict) and "text" in item and isinstance(item["text"], str):
+                        t_s = item["text"].strip()
+                        if t_s.startswith("{") and t_s.endswith("}"):
+                            try:
+                                sub = json.loads(t_s)
+                                if isinstance(sub, dict):
+                                    candidate_objs.append(sub)
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+
+    for obj in candidate_objs:
+        if "error" in obj and obj["error"]:
+            return True, f"JSON top-level error: {str(obj['error'])[:80]}"
+        for code_key in ("exit_code", "return_code", "exitcode", "returncode", "exit_status"):
+            if code_key in obj:
+                try:
+                    if int(obj[code_key]) != 0:
+                        return True, f"Non-zero {code_key}: {obj[code_key]}"
+                except (ValueError, TypeError):
+                    pass
+
+    if "<tool_use_error>" in s and "</tool_use_error>" in s:
+        return True, "<tool_use_error> tag present"
+
+    for pfx in ERROR_PREFIXES:
+        if s.startswith(pfx):
+            return True, f"Response starts with '{pfx}'"
+
+    return False, ""
+
+
+def _span_error(s: Span) -> str | None:
+    if s.status_code == 2:
+        return "Span status error: Code 2"
+    if s.attrs.get("error.type"):
+        return f"Span error: {s.attrs['error.type']}"
+    return None
+
+
+def unrecovered_tool_error_rule(t: Trace) -> Verdict:
+    """FAULTLINE P18: caught 13 of 23 confirmed unrecovered errors (recall 0.57, kappa 0.54); misses plain-text errors and run-ending API failures (faultgate has no check for those yet; read flagged traces manually)."""
+    steps = t.steps
+
+    for i, st in enumerate(steps):
+        is_err, desc = _is_structural_error(st.result)
+        if not is_err:
+            continue
+        tool_name = st.tool
+        recovered = False
+        for future_st in steps[i + 1:]:
+            if future_st.tool == tool_name:
+                future_is_err, _ = _is_structural_error(future_st.result)
+                if not future_is_err:
+                    recovered = True
+                    break
+        if not recovered:
+            return Verdict(
+                True,
+                1.0,
+                f"Tool '{tool_name}' failed at step {st.index} ({desc}) and no subsequent call to '{tool_name}' succeeded.",
+            )
+
+    steps_by_span: dict[str, list] = {}
+    for st in steps:
+        steps_by_span.setdefault(st.span_id, []).append(st)
+
+    for i, span in enumerate(t.spans):
+        err = _span_error(span)
+        if err is not None:
+            recovered = False
+            for later_span in t.spans[i + 1:]:
+                if _span_error(later_span) is not None:
+                    continue
+                later_steps = steps_by_span.get(later_span.span_id, [])
+                if later_steps and not any(_is_structural_error(s.result)[0] for s in later_steps):
+                    recovered = True
+                    break
+            if not recovered:
+                return Verdict(True, 1.0, f"Unrecovered span error at span {i+1} of {len(t.spans)}: {err}")
+
+    return Verdict(False, 1.0, "no unrecovered tool errors")
+
+
 CHECKS: dict[str, Check] = {
     c.name: c
     for c in (
@@ -197,6 +359,16 @@ CHECKS: dict[str, Check] = {
             rule=partial(policy_rule, policy=Policy()),
         ),
         Check(
+            "repeated_call",
+            "Same tool and arguments called >=3 times with identical results.",
+            rule=repeated_call_rule,
+        ),
+        Check(
+            "unrecovered_tool_error",
+            "A tool call produced a structural error and the tool was never used successfully afterwards.",
+            rule=unrecovered_tool_error_rule,
+        ),
+        Check(
             "wrong_answer",
             "Answered, but the expected answer is not in the final answer (needs --golden).",
             rule=None, needs="golden",
@@ -214,6 +386,7 @@ CHECKS: dict[str, Check] = {
         ),
     )
 }
+
 
 
 GOLDEN_RULES = {"wrong_answer": wrong_answer_rule, "truncation": truncation_rule}

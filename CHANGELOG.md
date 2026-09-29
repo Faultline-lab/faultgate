@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — 2026-09-29
+
+- Chat-only trace support: tool calls embedded inside message parts (paired with tool responses by ID), in addition to `execute_tool` spans.
+- New rule checks: `repeated_call` (same tool + normalized arguments issued >= 3 times with identical result, κ 0.95 vs a blind second rater (Claude Opus 5.5) on 97 real runs) and `unrecovered_tool_error` (structural tool error with no later success, or a span error (error.type or status code 2) with no later successful tool call; recall 0.57, κ 0.54), calibrated against FAULTLINE P18 on Exgentic real benchmark traces.
+- `scripts/fetch_real_traces.py` and `make demo-real`: sample real traces across 6 benchmarks from `Exgentic/agent-llm-traces-v2` and evaluate with default rule checks.
+- `demo-real` works from an empty cache via `snapshot_download`, carries span status codes into OTLP, and adds `demo` optional dependency group.
+- Hybrid traces preserve message-embedded tool calls deduplicated against `execute_tool` span IDs.
+- Tool and span error signals preserved (Span `status_code` parsed from OTLP status, `is_error`/error status flagged on message tool call responses).
+- Hybrid trace steps ordered chronologically by span start time, preserving originating `span_id`.
+- Span error recovery ported from FAULTLINE P18: middle span errors unrecovered unless a later span runs a non-error tool call.
+- Pinned Exgentic dataset revision in `scripts/fetch_real_traces.py` and handled expected trace-failure exit code in `make demo-real`.
+
 ## 0.1.0 — 2026-09-22
 
 - `faultgate check <traces.json>`: run checks over an OTLP/JSON GenAI-semconv trace export; exit 1 if any fires.

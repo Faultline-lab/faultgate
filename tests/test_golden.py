@@ -38,7 +38,15 @@ def test_cli_with_golden(tmp_path):
     out = tmp_path / "r.json"
     assert cli.main(["check", str(EXAMPLES), "--golden", str(GOLDEN), "--json", str(out)]) == 1
     fired = json.loads(out.read_text())["fired"]
-    assert fired == {"search_loop": 1, "abstention": 1, "policy": 0, "wrong_answer": 2, "truncation": 1}
+    assert fired == {
+        "search_loop": 1,
+        "abstention": 1,
+        "policy": 0,
+        "repeated_call": 0,
+        "unrecovered_tool_error": 0,
+        "wrong_answer": 2,
+        "truncation": 1,
+    }
 
 
 def test_golden_load_rejects_bad_shape(tmp_path):

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "faultgate"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local-first release gate for AI agents: check recorded traces for known failure modes through a pluggable judge."
 readme = "README.md"
 license = "MIT"
@@ -25,6 +25,8 @@ dependencies = ["pydantic>=2"]
 laya = ["laya>=0.3.5"]
 api = ["litellm>=1.70"]
 dev = ["pytest>=8"]
+demo = ["pyarrow", "huggingface_hub"]
+
 
 [project.scripts]
 faultgate = "faultgate.cli:main"

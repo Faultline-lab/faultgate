@@ -67,3 +67,269 @@ def test_render_budget_keeps_answer_and_tail():
 def test_render_budget_noop_when_it_fits():
     t = load_otlp(EXAMPLES)[2]
     assert "omitted" not in t.render(1800) and t.render(1800).count("Step ") == 2
+
+
+def _chat_trace_doc():
+    """Synthetic P18/Exgentic-style chat trace with message-embedded tool calls and responses."""
+    return {
+        "resourceSpans": [
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "1" * 16,
+                                "name": "invoke_agent",
+                                "startTimeUnixNano": "10",
+                                "attributes": [{"key": "gen_ai.operation.name", "value": {"stringValue": "invoke_agent"}}],
+                            },
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "2" * 16,
+                                "parentSpanId": "1" * 16,
+                                "name": "chat",
+                                "startTimeUnixNano": "100",
+                                "attributes": [
+                                    {
+                                        "key": "gen_ai.input.messages",
+                                        "value": {"stringValue": json.dumps([{"role": "user", "parts": [{"type": "text", "content": "What is the secret?"}]}])},
+                                    },
+                                    {
+                                        "key": "gen_ai.output.messages",
+                                        "value": {"stringValue": json.dumps([{"role": "assistant", "parts": [
+                                            {"type": "tool_call", "id": "c1", "name": "search", "arguments": {"query": "secret"}},
+                                        ]}])},
+                                    },
+                                ],
+                            },
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "3" * 16,
+                                "parentSpanId": "1" * 16,
+                                "name": "chat",
+                                "startTimeUnixNano": "200",
+                                "attributes": [
+                                    {
+                                        "key": "gen_ai.input.messages",
+                                        "value": {"stringValue": json.dumps([{"role": "user", "parts": [
+                                            {"type": "tool_call_response", "id": "c1", "result": '[{"type": "text", "text": "secret is 42"}]'},
+                                        ]}])},
+                                    },
+                                    {
+                                        "key": "gen_ai.output.messages",
+                                        "value": {"stringValue": json.dumps([{"role": "assistant", "parts": [
+                                            {"type": "tool_call", "id": "c2", "name": "verify", "arguments": "42"},
+                                        ]}])},
+                                    },
+                                ],
+                            },
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "4" * 16,
+                                "parentSpanId": "1" * 16,
+                                "name": "chat",
+                                "startTimeUnixNano": "300",
+                                "attributes": [
+                                    {
+                                        "key": "gen_ai.input.messages",
+                                        "value": {"stringValue": json.dumps([{"role": "user", "parts": [
+                                            {"type": "tool_call_response", "id": "c2", "result": "verified"},
+                                        ]}])},
+                                    },
+                                    {
+                                        "key": "gen_ai.output.messages",
+                                        "value": {"stringValue": json.dumps([{"role": "assistant", "parts": [
+                                            {"type": "text", "content": "The answer is 42."},
+                                        ]}])},
+                                    },
+                                ],
+                            },
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+
+
+def test_chat_trace_prompt_and_answer(tmp_path):
+    p = tmp_path / "chat_trace.json"
+    p.write_text(json.dumps(_chat_trace_doc()))
+    (t,) = load_otlp(p)
+    assert t.prompt == "What is the secret?"
+    assert t.answer == "The answer is 42."
+
+
+def test_chat_trace_steps_and_responses(tmp_path):
+    p = tmp_path / "chat_trace.json"
+    p.write_text(json.dumps(_chat_trace_doc()))
+    (t,) = load_otlp(p)
+    assert len(t.steps) == 2
+    assert t.steps[0].index == 1
+    assert t.steps[0].tool == "search"
+    assert t.steps[0].arguments == '{"query": "secret"}'
+    assert t.steps[0].result == "secret is 42"
+    assert t.steps[1].index == 2
+    assert t.steps[1].tool == "verify"
+    assert t.steps[1].arguments == "42"
+    assert t.steps[1].result == "verified"
+
+
+def test_chat_trace_missing_response(tmp_path):
+    doc = _chat_trace_doc()
+    # Remove span 4 so c2 has no response
+    doc["resourceSpans"][0]["scopeSpans"][0]["spans"].pop()
+    p = tmp_path / "chat_unanswered.json"
+    p.write_text(json.dumps(doc))
+    (t,) = load_otlp(p)
+    assert len(t.steps) == 2
+    assert t.steps[1].tool == "verify"
+    assert t.steps[1].result == ""
+
+
+def test_hybrid_trace_keeps_embedded_calls_without_duplicate(tmp_path):
+    doc = {
+        "resourceSpans": [
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "1" * 16,
+                                "name": "invoke_agent",
+                                "startTimeUnixNano": "10",
+                                "attributes": [{"key": "gen_ai.operation.name", "value": {"stringValue": "invoke_agent"}}],
+                            },
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "2" * 16,
+                                "parentSpanId": "1" * 16,
+                                "name": "execute_tool bash",
+                                "startTimeUnixNano": "100",
+                                "attributes": [
+                                    {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+                                    {"key": "gen_ai.tool.name", "value": {"stringValue": "bash"}},
+                                    {"key": "gen_ai.tool.call.id", "value": {"stringValue": "c1"}},
+                                    {"key": "gen_ai.tool.call.arguments", "value": {"stringValue": "echo span_c1"}},
+                                    {"key": "gen_ai.tool.call.result", "value": {"stringValue": "span_res_c1"}},
+                                ],
+                            },
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "3" * 16,
+                                "parentSpanId": "1" * 16,
+                                "name": "chat",
+                                "startTimeUnixNano": "200",
+                                "attributes": [
+                                    {
+                                        "key": "gen_ai.output.messages",
+                                        "value": {"stringValue": json.dumps([
+                                            {"role": "assistant", "parts": [
+                                                {"type": "tool_call", "id": "c1", "name": "bash", "arguments": "echo msg_c1"},
+                                                {"type": "tool_call", "id": "c2", "name": "read", "arguments": "file.txt"},
+                                            ]}
+                                        ])},
+                                    },
+                                    {
+                                        "key": "gen_ai.input.messages",
+                                        "value": {"stringValue": json.dumps([
+                                            {"role": "user", "parts": [
+                                                {"type": "tool_call_response", "id": "c1", "result": "msg_res_c1"},
+                                                {"type": "tool_call_response", "id": "c2", "result": "file_contents"},
+                                            ]}
+                                        ])},
+                                    },
+                                ],
+                            },
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+    p = tmp_path / "hybrid.json"
+    p.write_text(json.dumps(doc))
+    (t,) = load_otlp(p)
+    assert len(t.steps) == 2
+    assert t.steps[0].index == 1
+    assert t.steps[0].tool == "bash"
+    assert t.steps[0].arguments == "echo span_c1"
+    assert t.steps[0].result == "span_res_c1"
+    assert t.steps[1].index == 2
+    assert t.steps[1].tool == "read"
+    assert t.steps[1].arguments == "file.txt"
+    assert t.steps[1].result == "file_contents"
+
+
+def test_hybrid_chronological_ordering(tmp_path):
+    doc = {
+        "resourceSpans": [
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "1" * 16,
+                                "name": "invoke_agent",
+                                "startTimeUnixNano": "10",
+                                "attributes": [{"key": "gen_ai.operation.name", "value": {"stringValue": "invoke_agent"}}],
+                            },
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "2" * 16,
+                                "parentSpanId": "1" * 16,
+                                "name": "chat",
+                                "startTimeUnixNano": "100",
+                                "attributes": [
+                                    {
+                                        "key": "gen_ai.output.messages",
+                                        "value": {"stringValue": json.dumps([
+                                            {"role": "assistant", "parts": [
+                                                {"type": "tool_call", "id": "c1", "name": "search", "arguments": "cats"},
+                                            ]}
+                                        ])},
+                                    },
+                                    {
+                                        "key": "gen_ai.input.messages",
+                                        "value": {"stringValue": json.dumps([
+                                            {"role": "user", "parts": [
+                                                {"type": "tool_call_response", "id": "c1", "result": "found cats"},
+                                            ]}
+                                        ])},
+                                    },
+                                ],
+                            },
+                            {
+                                "traceId": "a" * 32,
+                                "spanId": "3" * 16,
+                                "parentSpanId": "1" * 16,
+                                "name": "execute_tool write",
+                                "startTimeUnixNano": "200",
+                                "attributes": [
+                                    {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+                                    {"key": "gen_ai.tool.name", "value": {"stringValue": "write"}},
+                                    {"key": "gen_ai.tool.call.id", "value": {"stringValue": "c2"}},
+                                    {"key": "gen_ai.tool.call.arguments", "value": {"stringValue": "cats.txt"}},
+                                    {"key": "gen_ai.tool.call.result", "value": {"stringValue": "written"}},
+                                ],
+                            },
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+    p = tmp_path / "hybrid_chrono.json"
+    p.write_text(json.dumps(doc))
+    (t,) = load_otlp(p)
+    assert len(t.steps) == 2
+    assert [st.tool for st in t.steps] == ["search", "write"]
+    assert t.steps[0].index == 1
+    assert t.steps[0].tool == "search"
+    assert t.steps[0].arguments == "cats"
+    assert t.steps[1].index == 2
+    assert t.steps[1].tool == "write"
+    assert t.steps[1].arguments == "cats.txt"
