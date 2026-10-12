@@ -51,3 +51,20 @@ def test_listing(capsys):
     assert cli.main(["judges"]) == 0
     out = capsys.readouterr().out
     assert "search_loop" in out and "litellm:<model>" in out
+
+
+def test_exit_2_on_malformed_policy(tmp_path, capsys):
+    p = tmp_path / "policy.json"
+    p.write_text(json.dumps({"limits": [{"tool": "issue_refund"}]}))
+    assert cli.main(["check", str(EXAMPLES), "--policy", str(p)]) == 2
+    assert "policy: limits[0]" in capsys.readouterr().err
+
+
+def test_band_prints_hard_block(tmp_path, capsys):
+    gate = EXAMPLES.parent / "gate"
+    p = tmp_path / "policy.json"
+    p.write_text(json.dumps({"max_calls": 0}))
+    code = cli.main(["check", str(gate / "baseline_glm_run2.json"), "--band", str(gate / "band.json"),
+                     "--golden", str(gate / "golden.json"), "--policy", str(p)])
+    out = capsys.readouterr().out
+    assert code == 1 and "gate: FAIL · policy violation in 30 trace(s) (hard block)" in out

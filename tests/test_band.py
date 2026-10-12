@@ -3,7 +3,7 @@ import json
 import pytest
 
 from faultgate import band, cli
-from faultgate.checks import select
+from faultgate.checks import Policy, select
 from faultgate.runner import run
 from faultgate.trace import load_otlp
 from tests.conftest import EXAMPLES, FakeJudge
@@ -77,3 +77,15 @@ def test_cli_baseline_then_gate(monkeypatch, tmp_path, capsys):
     assert code == 0 and "gate: PASS" in text
     assert json.loads(rep.read_text())["gate"]["verdict"] == "PASS"
     assert cli.main(["baseline", str(GATE / "baseline_glm_run1.json"), "--judge", "fake", "--out", str(out)]) == 2
+
+
+def test_policy_violation_is_a_hard_block():
+    r1 = _report(GATE / "baseline_glm_run1.json", {})
+    b = band.build([r1, _report(GATE / "baseline_glm_run2.json", {})])  # min 1.0, n=30: PASS >= 29/30
+    cand = run(load_otlp(GATE / "baseline_glm_run1.json"), select(JUDGE_ONLY + ",policy", Policy(max_calls=0)), FakeJudge())
+    first = cand.trace_ids[0]
+    cand.results = [r for r in cand.results if r.check != "policy" or r.trace_id == first]  # one violation: 29/30 clean
+    g = band.evaluate(cand, b)
+    assert g["verdict"] == "FAIL" and g["policy_violations"] == [first]
+    g = band.evaluate(r1, b)
+    assert g["verdict"] == "PASS" and g["policy_violations"] == []
