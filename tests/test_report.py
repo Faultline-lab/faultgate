@@ -109,3 +109,149 @@ def test_action_posts_comment_and_summary():
     assert "<!-- faultgate -->" in action and "pull_request" in action
     assert "--audit" in action and "upload-artifact" in action
     assert "comment:" in action
+
+
+# --- review round 1 (Codex) ---
+
+def test_json_report_includes_measures(tmp_path):
+    out = tmp_path / "r.json"
+    cli.main(["check", str(GATE / "baseline_glm_run1.json"), "--json", str(out)])
+    m = json.loads(out.read_text())["measures"]
+    assert len(m) == 30 and all(v["latency_ms"] > 0 for v in m.values())
+
+
+def test_no_absolute_paths_in_markdown_or_audit(tmp_path, monkeypatch):
+    """Inputs under the working directory are written relative to it; anything else by file name only."""
+    outside = tmp_path / "secret-dir" / "candidate.json"
+    outside.parent.mkdir()
+    outside.write_bytes((GATE / "candidate_gpt.json").read_bytes())
+    monkeypatch.chdir(GATE.parents[1])  # the repo root
+    md, audit = tmp_path / "pr.md", tmp_path / "audit"
+    cli.main(["check", str(outside), "--band", str(GATE / "band.json"), "--golden", str(GATE / "golden.json"),
+              "--markdown", str(md), "--audit", str(audit)])
+    texts = [md.read_text(encoding="utf-8")] + [f.read_text(encoding="utf-8") for f in audit.iterdir()]
+    for t in texts:
+        assert str(tmp_path) not in t and str(GATE.parents[1]) not in t and "secret-dir" not in t
+        assert str(tmp_path).replace("\\", "\\\\") not in t
+    assert "examples/gate/band.json" in texts[0] and "candidate.json" in texts[0]
+    roles = {i["role"]: i["path"] for i in json.loads((audit / "verdict.json").read_text())["inputs"]}
+    assert roles == {"traces": "candidate.json", "band": "examples/gate/band.json", "golden": "examples/gate/golden.json"}
+
+
+def test_markdown_table_cells_are_escaped(tmp_path):
+    doc = json.loads(EXAMPLES.read_text(encoding="utf-8"))
+    for s in doc["resourceSpans"][0]["scopeSpans"][0]["spans"]:
+        if not s.get("parentSpanId"):
+            s["attributes"].append({"key": "faultgate.scenario", "value": {"stringValue": "a|b\n| injected | row |"}})
+    tr = tmp_path / "t.json"
+    tr.write_text(json.dumps(doc))
+    md = tmp_path / "pr.md"
+    cli.main(["check", str(tr), "--markdown", str(md)])
+    text = md.read_text(encoding="utf-8")
+    assert "a\|b \| injected \| row \|" in text
+    assert not any(line.startswith("| injected") for line in text.splitlines())
+
+
+# --- the composite action, executed: its bash steps run with fake faultgate / gh ---
+
+import re
+import shutil
+import subprocess
+
+ACTION = Path(__file__).resolve().parents[1] / "action.yml"
+
+
+def _run_scripts() -> list[str]:
+    """Each `run: |` block of action.yml, dedented."""
+    lines = ACTION.read_text(encoding="utf-8").splitlines()
+    blocks, i = [], 0
+    while i < len(lines):
+        m = re.match(r"^(\s*)run: \|\s*$", lines[i])
+        if m:
+            ind, body, i = len(m.group(1)), [], i + 1
+            while i < len(lines) and (not lines[i].strip() or len(lines[i]) - len(lines[i].lstrip()) > ind):
+                body.append(lines[i])
+                i += 1
+            pad = min(len(b) - len(b.lstrip()) for b in body if b.strip())
+            blocks.append("\n".join(b[pad:] for b in body) + "\n")
+        else:
+            i += 1
+    return blocks
+
+
+FAKES = r'''
+faultgate() {
+  printf '%s\n' "$@" > "$FAKE_DIR/faultgate.args"
+  while [ $# -gt 0 ]; do
+    if [ "$1" = "--markdown" ]; then printf '<!-- faultgate -->\n## faultgate: FAIL\n' > "$2"; fi
+    shift
+  done
+  return "${FAKE_CODE:-0}"
+}
+gh() {
+  printf '%s\n' "$*" >> "$FAKE_DIR/gh.log"
+  case "$*" in
+    *--paginate*) [ -n "$FAKE_LOOKUP_FAIL" ] && return 1; [ -n "$FAKE_EXISTING" ] && echo "$FAKE_EXISTING"; return 0 ;;
+  esac
+}
+pip() { :; }
+'''
+
+
+def _bash(script: str, env: dict, tmp: Path) -> subprocess.CompletedProcess:
+    (tmp / "fakes.sh").write_text(FAKES, encoding="utf-8")
+    (tmp / "step.sh").write_text(script, encoding="utf-8")
+    full = {**__import__("os").environ, **env, "BASH_ENV": str(tmp / "fakes.sh"), "FAKE_DIR": str(tmp)}
+    return subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", str(tmp / "step.sh")],
+                          env=full, capture_output=True, text=True, cwd=tmp)
+
+
+needs_bash = __import__("pytest").mark.skipif(shutil.which("bash") is None, reason="needs bash")
+
+
+def test_action_scripts_never_interpolate_inputs():
+    for s in _run_scripts():
+        assert "${{" not in s, s  # inputs reach the shell only as environment variables
+
+
+@needs_bash
+def test_action_gate_step_quotes_hostile_inputs_and_writes_outputs(tmp_path):
+    scripts = _run_scripts()
+    gate = next(s for s in scripts if "faultgate \"${args[@]}\"" in s)
+    out, summ = tmp_path / "out", tmp_path / "summary"
+    evil = 'x"; touch pwned; echo "'
+    env = {"TRACES": evil, "REPORT": "r.json", "AUDIT": "audit", "FORMAT": "auto", "REDACT": "builtin",
+           "BAND": "", "GOLDEN": "", "POLICY": "", "CHECKS": "", "JUDGE": "",
+           "GITHUB_OUTPUT": str(out), "GITHUB_STEP_SUMMARY": str(summ), "RUNNER_TEMP": str(tmp_path), "FAKE_CODE": "1"}
+    p = _bash(gate, env, tmp_path)
+    assert p.returncode == 0, p.stderr
+    assert not (tmp_path / "pwned").exists()
+    args = (tmp_path / "faultgate.args").read_text().splitlines()
+    assert args[:2] == ["check", evil]
+    outputs = out.read_text()
+    assert "code=1" in outputs and "verdict=FAIL" in outputs and "summary=" in outputs
+    assert "## faultgate: FAIL" in summ.read_text()
+
+
+@needs_bash
+def test_action_comment_step_updates_creates_and_degrades(tmp_path):
+    comment = next(s for s in _run_scripts() if "gh api" in s)
+    md = tmp_path / "s.md"
+    md.write_text("<!-- faultgate -->\nhi\n")
+    base = {"PR": "7", "REPO": "o/r", "MD": str(md), "GH_TOKEN": "x"}
+    assert _bash(comment, {**base, "FAKE_EXISTING": "123"}, tmp_path).returncode == 0
+    log = (tmp_path / "gh.log").read_text()
+    assert "-X PATCH repos/o/r/issues/comments/123 -F body=@" in log and "POST" not in log
+    (tmp_path / "gh.log").unlink()
+    assert _bash(comment, base, tmp_path).returncode == 0
+    assert "-X POST repos/o/r/issues/7/comments -F body=@" in (tmp_path / "gh.log").read_text()
+    p = _bash(comment, {**base, "FAKE_LOOKUP_FAIL": "1"}, tmp_path)
+    assert p.returncode == 0 and "::warning::" in p.stdout
+
+
+@needs_bash
+def test_action_final_step_fails_closed(tmp_path):
+    final = next(s for s in _run_scripts() if "exit" in s and "CODE" in s)
+    assert _bash(final, {"CODE": ""}, tmp_path).returncode == 2
+    assert _bash(final, {"CODE": "0"}, tmp_path).returncode == 0
+    assert _bash(final, {"CODE": "1"}, tmp_path).returncode == 1
