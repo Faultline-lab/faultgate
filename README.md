@@ -4,15 +4,15 @@
 
 ```
 $ faultgate check examples/traces.json
-trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error
-------------------------------------------------------------------------------------------------------------
-fc2cdab304bd  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-6d1f9d67a2d4  ok   1.00         FAIL 1.00         ok   1.00         ok   1.00         ok   1.00
-8bf3879339eb  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-3a9e507a0f6d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-2ab3b6c1e891  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
+------------------------------------------------------------------------------------------------------------------------------
+fc2cdab304bd  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+6d1f9d67a2d4  ok   1.00         FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+8bf3879339eb  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3a9e507a0f6d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+2ab3b6c1e891  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
 
-2/5 traces failed · search_loop=1, abstention=1, policy=0, repeated_call=0, unrecovered_tool_error=0 · judge none · 0.0s
+2/5 traces failed · search_loop=1, abstention=1, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
 $ echo $?
 1
 ```
@@ -127,6 +127,7 @@ These are public benchmark traces, not production traffic; the P18 sample was st
 | `policy` | rule | A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, call budget, argument limit, identity mismatch, or missing prerequisite. |
 | `repeated_call` | rule | The same tool was called with identical arguments and returned identical results >= 3 times. |
 | `unrecovered_tool_error` | rule | A tool call produced a structural error with no later successful call of the same tool, or a span errored (error.type or status code 2) and no later span made a successful tool call. |
+| `context_overflow` | rule | The run hit the model's context window or output token limit: a span's `gen_ai.response.finish_reasons` says `length` / `max_tokens`, or a provider error naming the context limit (`context_length_exceeded`, "maximum context length", "prompt is too long") in a span status, `error.type`, tool result or `faultgate.termination`. |
 | `wrong_answer` | golden | Answered, and the expected answer is not in the final answer. |
 | `truncation` | golden | The answer has the head of the expected token but not the whole token (`Onyx` for `Onyx-4413`). |
 | `wrong_direction` | judge | On a multi-hop task, the agent walked the dependency chain backwards. |
@@ -243,6 +244,7 @@ This is the part every evaluation tool skips. Every check and judge here is scor
 | `search_loop` | rule | 36 | 1.00 | 0.99 | **0.98** | **1.00** |
 | `abstention` | rule | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
 | `policy` | rule | synthetic | 4/4 P9 categories | 0 FP on 290 real traces | — | — |
+| `context_overflow` | rule | synthetic | finish-reason and provider-error forms in `tests/test_checks.py` | 0 FP on the 125 shipped real traces | — | — |
 | `wrong_answer` | golden | 4 | 1.00 | 1.00 | 1.00 | 1.00 |
 | `truncation` | golden | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
 | `wrong_direction` | Laya judge | 1 | 1.00 | 0.61 | 0.02 | 0.00 |

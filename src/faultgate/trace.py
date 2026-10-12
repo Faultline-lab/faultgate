@@ -25,6 +25,8 @@ class Span(BaseModel):
     start_ns: int
     attrs: dict[str, Any]
     status_code: int = 0
+    status_message: str = ""
+    end_ns: int = 0
 
 
 class Step(BaseModel):
@@ -285,6 +287,8 @@ def load_otlp(path: str | Path) -> list[Trace]:
                     start_ns=int(s.get("startTimeUnixNano", 0)),
                     attrs=attrs,
                     status_code=status_code,
+                    status_message=str(st.get("message", "")),
+                    end_ns=int(s.get("endTimeUnixNano", 0)),
                 )
                 by_trace.setdefault(s["traceId"], []).append(span)
                 if "gen_ai.agent.name" in attrs:
