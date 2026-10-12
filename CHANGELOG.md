@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Policy business rules in `policy.json`: `limits` (numeric min/max on a tool argument, dotted paths, `"$1,200.50"` parsed), `identity` (argument must equal the root span's `enduser.id` or another `session_attr`), `requires` (tool order prerequisites, optionally on the earlier result). Each fails closed when it cannot be checked. Malformed keys exit 2.
+- Hard block: with `--band`, any `policy` violation makes the gate FAIL regardless of clean rate; the gate result lists `policy_violations`.
+- `examples/policy_support.json`: a customer-support policy using every key.
+
 ## 0.2.0 — 2026-09-29
 
 - Chat-only trace support: tool calls embedded inside message parts (paired with tool responses by ID), in addition to `execute_tool` spans.

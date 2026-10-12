@@ -124,7 +124,7 @@ These are public benchmark traces, not production traffic; the P18 sample was st
 |---|---|---|
 | `search_loop` | rule | The run ended with no answer at its step budget and most tool calls returned nothing. |
 | `abstention` | rule | The final answer explicitly says the information could not be found. |
-| `policy` | rule | A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, or call budget. |
+| `policy` | rule | A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, call budget, argument limit, identity mismatch, or missing prerequisite. |
 | `repeated_call` | rule | The same tool was called with identical arguments and returned identical results >= 3 times. |
 | `unrecovered_tool_error` | rule | A tool call produced a structural error with no later successful call of the same tool, or a span errored (error.type or status code 2) and no later span made a successful tool call. |
 | `wrong_answer` | golden | Answered, and the expected answer is not in the final answer. |
@@ -140,6 +140,24 @@ A **rule** is plain code over the trace structure: instant, deterministic, no mo
 ```
 
 `faultgate check traces.json --policy policy.json` then flags every step that called a tool outside `allow`, passed an argument matching a denied pattern (path traversal, `file://`, `/etc/passwd`, `~/.ssh` out of the box), exceeded `max_arg_chars`, or pushed the run past `max_calls` — with the step number in the reason. It is FAULTLINE P16's runtime policy applied after the fact: the four structural injection categories from P9 (`tool_exfil_path`, `unlisted_tool`, `query_dump`, `budget_loop`) are each caught by a test in `tests/test_policy.py`. Without a policy file only the denied-pattern rule is active, and it fires on 0 of the 290 real traces shipped here.
+
+Three more keys check business rules on what the agent actually did, not just which tools it touched:
+
+```json
+{
+ "limits":   [{"tool": "issue_refund", "arg": "amount", "min": 0, "max": 500}],
+ "identity": {"arg": "customer_id", "session_attr": "enduser.id", "tools": ["issue_refund", "modify_billing_record"]},
+ "requires": [{"tool": "modify_billing_record", "after": "verify_customer_identity", "result_contains": "VERIFIED"}]
+}
+```
+
+- `limits`: a numeric floor or ceiling on one argument of one tool. `arg` is a dotted path into the JSON arguments (`refund.amount`). Strings like `"$1,200.50"` are read as numbers. An argument that is present but not a number, or arguments that are not a JSON object, count as a violation; an absent argument (or no arguments at all) does not. Arguments encoded as JSON twice are decoded. `min`/`max` must be finite numbers.
+- `identity`: the argument must equal the authenticated principal, read from the root span attribute `session_attr` (default `enduser.id`). Only calls that carry the argument are checked, optionally only for `tools`. If the root span has no such attribute, the call cannot be verified and counts as a violation. So do unreadable (non-JSON-object) arguments on a listed tool, or on any tool when no `tools` list is given and the argument's name appears in the text.
+- `requires`: `tool` may only run after an earlier call to `after`, and, if `result_contains` is set, one whose result contains that text.
+
+Reasons name the step and the values: `step 4: modify_billing_record.customer_id 'C-999' != session enduser.id 'C-123'`. [`examples/policy_support.json`](examples/policy_support.json) is a complete customer-support policy. A malformed policy file exits 2.
+
+**A policy violation is a hard block.** With `--band`, a run whose clean rate sits inside the measured band still FAILs if the `policy` check fired on any trace; the gate prints `policy violation in N trace(s) (hard block)` and lists them under `policy_violations` in the JSON report. Noise explains a flaky answer, not a refund over the limit.
 
 Semantic injections — the agent *obeying* text it read in a document — are a judge question, not a rule, and are not in this release.
 
