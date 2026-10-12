@@ -71,8 +71,18 @@ def _golden(args) -> Golden | None:
     return Golden.load(args.golden) if args.golden else None
 
 
+CONVENTIONAL_POLICY = "faultline-policy.json"
+
+
 def _policy(args) -> Policy | None:
-    return Policy.load(args.policy) if args.policy else None
+    """--policy, else ./faultline-policy.json when present (the conventional name), else none."""
+    if args.policy:
+        return Policy.load(args.policy)
+    if Path(CONVENTIONAL_POLICY).is_file():
+        print(f"note: using ./{CONVENTIONAL_POLICY} (pass --policy to choose another file)", file=sys.stderr)
+        args.policy = CONVENTIONAL_POLICY  # so the audit records it as an input
+        return Policy.load(CONVENTIONAL_POLICY)
+    return None
 
 
 def cmd_check(args: argparse.Namespace) -> int:

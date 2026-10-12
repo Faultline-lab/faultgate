@@ -184,7 +184,7 @@ Three more keys check business rules on what the agent actually did, not just wh
 - `identity`: the argument must equal the authenticated principal, read from the root span attribute `session_attr` (default `enduser.id`). Only calls that carry the argument are checked, optionally only for `tools`. If the root span has no such attribute, the call cannot be verified and counts as a violation. So do unreadable (non-JSON-object) arguments on a listed tool, or on any tool when no `tools` list is given and the argument's name appears in the text.
 - `requires`: `tool` may only run after an earlier call to `after`, and, if `result_contains` is set, one whose result contains that text.
 
-Reasons name the step and the values: `step 4: modify_billing_record.customer_id 'C-999' != session enduser.id 'C-123'`. [`examples/policy_support.json`](examples/policy_support.json) is a complete customer-support policy. A malformed policy file exits 2.
+Without `--policy`, a `faultline-policy.json` in the working directory is used (the CLI says so on stderr). Reasons name the step and the values: `step 4: modify_billing_record.customer_id 'C-999' != session enduser.id 'C-123'`. [`examples/policy_support.json`](examples/policy_support.json) is a complete customer-support policy. A malformed policy file exits 2.
 
 **A policy violation is a hard block.** With `--band`, a run whose clean rate sits inside the measured band still FAILs if the `policy` check fired on any trace; the gate prints `policy violation in N trace(s) (hard block)` and lists them under `policy_violations` in the JSON report. Noise explains a flaky answer, not a refund over the limit.
 

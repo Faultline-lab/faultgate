@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Policy business rules in `policy.json`: `limits` (numeric min/max on a tool argument, dotted paths, `"$1,200.50"` parsed), `identity` (argument must equal the root span's `enduser.id` or another `session_attr`), `requires` (tool order prerequisites, optionally on the earlier result). Each fails closed when it cannot be checked. Malformed keys exit 2.
+- Without `--policy`, `./faultline-policy.json` is used when present.
 - Hard block: with `--band`, any `policy` violation makes the gate FAIL regardless of clean rate; the gate result lists `policy_violations`.
 - `examples/policy_support.json`: a customer-support policy using every key.
 - New default rule `context_overflow`: the run hit the context window or output token limit (`gen_ai.response.finish_reasons` `length` / `max_tokens`, or a provider context-limit error in a span status message, `error.type`, tool result or `faultgate.termination`). 0 detections on the 125 shipped real traces and the 30-trace `make demo-real` sample. Spans now keep `status.message` and `endTimeUnixNano`. The default report gains a column.
