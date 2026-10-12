@@ -64,13 +64,19 @@ def build(reports: list[Report]) -> dict[str, Any]:
     }
 
 
+def _per_run(band: dict[str, Any]) -> list[float]:
+    """Per-run clean rates; bands written without them fall back to the observed [min, max]."""
+    cr = band["clean_rate"]
+    return list(cr.get("per_run") or [cr["min"], cr["max"]])
+
+
 def stats(rate: float, n: int, band: dict[str, Any]) -> dict[str, Any]:
     """One-sided test that the candidate's clean rate is below the baseline mean, and the n needed to tell.
 
     Variance = baseline binomial (runs x n trials) + candidate binomial (n trials) + run-to-run variance.
     ``required_n`` is the two-proportion sample size per arm for the observed drop, or None when there is no drop.
     """
-    per_run = band["clean_rate"]["per_run"]
+    per_run = _per_run(band)
     runs = len(per_run)
     p_b = sum(per_run) / runs
     between = variance(per_run) if runs > 1 else 0.0
@@ -116,8 +122,9 @@ def evaluate(report: Report, band: dict[str, Any]) -> dict[str, Any]:
         warnings.append(f"band was built with judge={band['judge']} checks={band['checks']}; this run used judge={report.judge} checks={report.checks}")
     if missing:
         warnings.append(f"{len(missing)} band scenario(s) absent from this run, counted as not clean")
-    if len(band["clean_rate"]["per_run"]) < RECOMMENDED_RUNS:
-        warnings.append(f"band built from {len(band['clean_rate']['per_run'])} baseline runs; use {RECOMMENDED_RUNS} or more "
+    runs = band.get("runs", len(_per_run(band)))
+    if runs < RECOMMENDED_RUNS:
+        warnings.append(f"band built from {runs} baseline runs; use {RECOMMENDED_RUNS} or more "
                         "for a stable noise estimate")
     return {
         "verdict": verdict,

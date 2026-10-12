@@ -167,23 +167,24 @@ Agents are not deterministic. FAULTLINE P11 ran the same model on the same 30 in
 
 ```
 $ faultgate baseline examples/gate/baseline_glm_run1.json examples/gate/baseline_glm_run2.json --out band.json
+note: 2 baseline runs measure noise poorly; use 3 or more
 examples/gate/baseline_glm_run1.json: 30 traces · clean rate 0.93 · 0.0s
 examples/gate/baseline_glm_run2.json: 30 traces · clean rate 0.93 · 0.0s
 band [0.93, 0.93] over 30 scenarios × 2 runs · 26 clean in every run · written to band.json
 
 $ faultgate check examples/gate/candidate_gpt.json --band band.json
-18/30 traces failed · search_loop=18, abstention=0 · judge none · 0.0s
-gate: FAIL · clean rate 0.40 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+18/30 traces failed · search_loop=18, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0 · judge none · 0.0s
+gate: FAIL · clean rate 0.40 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83 · p=0.000
 regressions (clean in every baseline, not now): r-0208, r-0214, r-0216, r-0224, r-0226, r-0232, r-0258, ...
 
 $ faultgate check examples/gate/candidate_qwen.json --band band.json
-gate: FAIL · clean rate 0.70 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+gate: FAIL · clean rate 0.70 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83 · p=0.005
 
 $ faultgate check examples/gate/baseline_glm_run2.json --band band.json
-gate: PASS · clean rate 0.93 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+gate: PASS · clean rate 0.93 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83 · p=0.500
 ```
 
-Real runs: two `z-ai/glm-5.3-flash` baselines and `openai/gpt-5.6-luna` / `qwen/qwen3.7-flash` candidates on the same 30 multi-hop scenarios. The verdicts match FAULTLINE P11's live drill (R4 FAIL / R1 FAIL / R2 PASS), which cost $1.84 and an API judge; this took 0.0 s and no model.
+Real runs (table rows and most stderr notes omitted): two `z-ai/glm-5.3-flash` baselines and `openai/gpt-5.6-luna` / `qwen/qwen3.7-flash` candidates on the same 30 multi-hop scenarios. The verdicts match FAULTLINE P11's live drill (R4 FAIL / R1 FAIL / R2 PASS), which cost $1.84 and an API judge; this took 0.0 s and no model.
 
 | Verdict | Rule (n = scenarios in the band) | Exit |
 |---|---|---|
@@ -211,12 +212,12 @@ examples/gate/baseline_glm_run2.json: 30 traces · clean rate 0.87 · 0.0s      
 band [0.80, 0.87] over 30 scenarios × 2 runs · 21 clean in every run
 
 $ faultgate check examples/gate/candidate_gpt.json --golden examples/gate/golden.json --band band.json
-21/30 traces failed · search_loop=18, abstention=0, policy=0, wrong_answer=3, truncation=3
-gate: FAIL · clean rate 0.30 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70
+21/30 traces failed · search_loop=18, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, wrong_answer=3, truncation=3 · judge none · 0.0s
+gate: FAIL · clean rate 0.30 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70 · p=0.000
 
 $ faultgate check examples/gate/candidate_qwen.json --golden examples/gate/golden.json --band band.json
-18/30 traces failed · search_loop=9, abstention=0, policy=0, wrong_answer=9, truncation=8
-gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70
+18/30 traces failed · search_loop=9, abstention=0, policy=0, repeated_call=1, unrecovered_tool_error=0, wrong_answer=9, truncation=8 · judge none · 0.0s
+gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70 · p=0.000
 ```
 
 (Qwen returns the head of the answer token without its suffix in 8 of 30 runs. Nobody had noticed.)
