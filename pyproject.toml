@@ -32,7 +32,7 @@ demo = ["pyarrow", "huggingface_hub"]
 faultgate = "faultgate.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/samirsawarkar/faultgate"
+Homepage = "https://github.com/Faultline-lab/faultgate"
 Evidence = "https://github.com/samirsawarkar/faultline-ai-reliability"
 
 [tool.setuptools.packages.find]
