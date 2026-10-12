@@ -23,6 +23,7 @@ class Report:
     checks: list[str]
     results: list[Result] = field(default_factory=list)
     redaction: str = "off"
+    measures: dict[str, dict[str, float | None]] = field(default_factory=dict)  # trace id -> tokens, latency_ms, cost_usd
 
     @property
     def trace_ids(self) -> list[str]:
@@ -91,6 +92,9 @@ def run(traces: list[Trace], checks: list[Check], judge: Judge | None = None,
     report = Report(judge=judge.name if judge else "none", checks=[c.name for c in active],
                     redaction=getattr(redact, "name", "custom") if redact else "off")
     for t in traces:
+        u = t.usage
+        report.measures[t.trace_id] = {"tokens": float(sum(u.values())) if u else None,
+                                       "latency_ms": t.latency_ms, "cost_usd": t.cost_usd}
         state = None
         for c in active:
             if c.rule:

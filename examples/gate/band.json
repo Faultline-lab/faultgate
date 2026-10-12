@@ -73,5 +73,10 @@
   "r-0349",
   "r-0350"
  ],
- "rule": "PASS if clean_rate >= min - 1/n; FAIL if clean_rate < min - 3/n; else WARN"
+ "usage": {
+  "tokens": null,
+  "latency_ms": 16483.333333333332,
+  "cost_usd": null
+ },
+ "rule": "PASS if clean_rate >= min - 1/n; FAIL if clean_rate < min - 3/n or the drop from the baseline mean is significant (one-sided, alpha 0.05); else INCONCLUSIVE with the n needed for power 0.8"
 }

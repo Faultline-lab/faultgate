@@ -2,14 +2,20 @@ name: faultgate
 description: Gate a deploy on recorded agent traces — rule checks, optional band, golden answers and policy. Exit 1 on FAIL.
 branding: { icon: shield, color: red }
 inputs:
-  traces:  { description: "OTLP/JSON trace export to check", required: true }
+  traces:  { description: "trace export to check (OTLP/JSON, OpenInference, Langfuse, LangSmith or Braintrust)", required: true }
   band:    { description: "band.json from `faultgate baseline` (FAIL only outside the measured band)", required: false, default: "" }
   golden:  { description: "golden.json of expected answers", required: false, default: "" }
-  policy:  { description: "policy.json of allowed tools / patterns / budgets", required: false, default: "" }
+  policy:  { description: "policy.json of allowed tools / patterns / budgets / limits / identity / prerequisites", required: false, default: "" }
   checks:  { description: "comma-separated subset of checks", required: false, default: "" }
   judge:   { description: "laya or litellm:<model>; needs the [laya] / [api] extra installed", required: false, default: "" }
+  format:  { description: "trace format (default: detect)", required: false, default: "auto" }
+  redact:  { description: "builtin | presidio | off — masking of PII and secrets in judge input and reasons", required: false, default: "builtin" }
   report:  { description: "path to write the JSON report", required: false, default: "faultgate-report.json" }
+  audit:   { description: "directory for verdict.json, failing_traces.json and repro.sh (uploaded as an artifact)", required: false, default: "faultgate-audit" }
+  comment: { description: "on pull requests, post or update one summary comment (needs pull-requests: write)", required: false, default: "true" }
   version: { description: "faultgate version spec, or a path/VCS spec for pip", required: false, default: "faultgate" }
+outputs:
+  verdict: { description: "PASS, FAIL or INCONCLUSIVE", value: "${{ steps.gate.outputs.verdict }}" }
 runs:
   using: composite
   steps:
@@ -17,12 +23,48 @@ runs:
       with: { python-version: "3.12" }
     - shell: bash
       run: pip install --quiet "${{ inputs.version }}"
-    - shell: bash
+    - id: gate
+      shell: bash
       run: |
-        args=(check "${{ inputs.traces }}" --json "${{ inputs.report }}")
+        md="$RUNNER_TEMP/faultgate-summary.md"
+        args=(check "${{ inputs.traces }}" --json "${{ inputs.report }}" --markdown "$md" --audit "${{ inputs.audit }}"
+              --format "${{ inputs.format }}" --redact "${{ inputs.redact }}")
         [ -n "${{ inputs.band }}" ]   && args+=(--band "${{ inputs.band }}")
         [ -n "${{ inputs.golden }}" ] && args+=(--golden "${{ inputs.golden }}")
         [ -n "${{ inputs.policy }}" ] && args+=(--policy "${{ inputs.policy }}")
         [ -n "${{ inputs.checks }}" ] && args+=(--check "${{ inputs.checks }}")
         [ -n "${{ inputs.judge }}" ]  && args+=(--judge "${{ inputs.judge }}")
+        set +e
         faultgate "${args[@]}"
+        code=$?
+        set -e
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+        if [ -f "$md" ]; then
+          cat "$md" >> "$GITHUB_STEP_SUMMARY"
+          echo "verdict=$(sed -n 's/^## faultgate: //p' "$md" | head -1)" >> "$GITHUB_OUTPUT"
+          echo "summary=$md" >> "$GITHUB_OUTPUT"
+        fi
+    - if: ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && steps.gate.outputs.summary != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+        MD: ${{ steps.gate.outputs.summary }}
+      run: |
+        # one comment per PR, found by its <!-- faultgate --> marker and updated in place
+        id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- faultgate -->")) | .id' | head -1)
+        if [ -n "$id" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$MD" > /dev/null
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$MD" > /dev/null
+        fi || echo "::warning::faultgate could not comment on the PR (give the job pull-requests: write)"
+    - if: ${{ always() && inputs.audit != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: faultgate-audit
+        path: ${{ inputs.audit }}
+        if-no-files-found: ignore
+        overwrite: true
+    - shell: bash
+      run: exit ${{ steps.gate.outputs.code || 2 }}  # no recorded code means the gate did not run: fail closed
