@@ -1,10 +1,12 @@
 """Run checks over traces with a judge. Pure: no I/O."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass, field, replace
 
 from faultgate.checks import Check
 from faultgate.judge import Judge, Verdict
+from faultgate.redact import safe_key
 from faultgate.trace import Trace
 
 
@@ -21,6 +23,8 @@ class Report:
     judge: str
     checks: list[str]
     results: list[Result] = field(default_factory=list)
+    redaction: str = "off"
+    measures: dict[str, dict[str, float | None]] = field(default_factory=dict)  # trace id -> tokens, latency_ms, cost_usd
 
     @property
     def trace_ids(self) -> list[str]:
@@ -66,9 +70,11 @@ class Report:
         return {
             "judge": self.judge,
             "checks": self.checks,
+            "redaction": self.redaction,
             "traces": len(self.trace_ids),
             "failed_traces": self.failed_traces,
             "fired": self.fired,
+            "measures": self.measures,
             "results": [
                 {"trace_id": r.trace_id, "scenario": r.scenario, "check": r.check, "detected": r.verdict.detected,
                  "confidence": round(r.verdict.confidence, 4), "reason": r.verdict.reason}
@@ -77,17 +83,32 @@ class Report:
         }
 
 
-def run(traces: list[Trace], checks: list[Check], judge: Judge | None = None) -> Report:
-    """Rules always run. Judge checks need a judge, golden checks a golden file; unbound ones are dropped from the report."""
+def run(traces: list[Trace], checks: list[Check], judge: Judge | None = None,
+        redact: Callable[[str], str] | None = None) -> Report:
+    """Rules always run. Judge checks need a judge, golden checks a golden file; unbound ones are dropped from the report.
+
+    With ``redact``, every verdict reason is masked, and so is the trace sent to a judge marked ``remote``
+    (an API model). Rules always read the raw trace: masking happens only on what can leave.
+    """
     active = [c for c in checks if c.rule or (c.question and judge is not None)]
-    report = Report(judge=judge.name if judge else "none", checks=[c.name for c in active])
+    report = Report(judge=judge.name if judge else "none", checks=[c.name for c in active],
+                    redaction=getattr(redact, "name", "custom") if redact else "off")
     for t in traces:
+        scenario = safe_key(t.key, redact)  # what is written out and matched against bands
+        u = t.usage
+        report.measures[t.trace_id] = {"tokens": float(sum(u.values())) if u else None,
+                                       "latency_ms": t.latency_ms, "cost_usd": t.cost_usd}
         state = None
         for c in active:
             if c.rule:
                 v = c.rule(t)
             else:
-                state = state if state is not None else t.render(getattr(judge, "budget", None))
+                if state is None:
+                    state = t.render(getattr(judge, "budget", None))
+                    if redact and getattr(judge, "remote", False):
+                        state = redact(state)
                 v = judge.ask(state, c.question)
-            report.results.append(Result(t.trace_id, t.key, c.name, v))
+            if redact:
+                v = replace(v, reason=redact(v.reason))
+            report.results.append(Result(t.trace_id, scenario, c.name, v))
     return report

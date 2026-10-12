@@ -4,15 +4,15 @@
 
 ```
 $ faultgate check examples/traces.json
-trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error
-------------------------------------------------------------------------------------------------------------
-fc2cdab304bd  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-6d1f9d67a2d4  ok   1.00         FAIL 1.00         ok   1.00         ok   1.00         ok   1.00
-8bf3879339eb  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-3a9e507a0f6d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-2ab3b6c1e891  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
+------------------------------------------------------------------------------------------------------------------------------
+fc2cdab304bd  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+6d1f9d67a2d4  ok   1.00         FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+8bf3879339eb  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3a9e507a0f6d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+2ab3b6c1e891  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
 
-2/5 traces failed · search_loop=1, abstention=1, policy=0, repeated_call=0, unrecovered_tool_error=0 · judge none · 0.0s
+2/5 traces failed · search_loop=1, abstention=1, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
 $ echo $?
 1
 ```
@@ -30,6 +30,7 @@ Requires Python 3.11 or newer. One dependency (pydantic). The built-in checks ar
 ```bash
 pip install 'faultgate[laya]'   # local judge: downloads Laya once (~800 MB, Apache-2.0, pinned revision), offline after
 pip install 'faultgate[api]'    # any API model through litellm
+pip install 'faultgate[pii]'    # Microsoft Presidio for --redact presidio (names, locations; MIT)
 ```
 
 Read [How much to trust a verdict](#how-much-to-trust-a-verdict) before you enable a judge.
@@ -43,10 +44,12 @@ faultgate check traces.json --golden golden.json     # expected answers: correct
 faultgate check traces.json --policy policy.json     # what the agent was allowed to do
 faultgate check traces.json --judge laya             # also run judge checks, locally
 faultgate check traces.json --judge litellm:openai/gpt-5.6-luna   # any API model
+faultgate check traces.json --markdown pr.md --audit audit/   # PR comment + audit files
+faultgate precheck traces.json                       # validate an export before gating
 faultgate checks                                     # list checks and their kind
 faultgate judges                                     # list judge specs
 
-faultgate baseline run1.json run2.json --out band.json   # measure your noise (>= 2 runs)
+faultgate baseline run1.json run2.json run3.json --out band.json   # measure your noise (3+ runs)
 faultgate check candidate.json --band band.json          # regression, or just noise?
 ```
 
@@ -63,6 +66,31 @@ An [OTLP/JSON](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)
 
 Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](https://github.com/Faultline-lab/faultgate/blob/main/examples/traces.json) is a complete reference file.
 
+### Other trace formats
+
+`faultgate` also reads the exports of the common agent-observability tools and maps them onto the same attributes, so every check, policy and judge works unchanged. The format is detected; force it with `--format`.
+
+| `--format` | Export | Steps come from |
+|---|---|---|
+| `otlp` | OTLP/JSON, GenAI semantic conventions | `execute_tool` spans and tool calls inside chat messages |
+| `openinference` | OTLP with `openinference.span.kind` (Arize Phoenix) | `TOOL` spans: `tool.name`, `tool.parameters` or `input.value`, `output.value` |
+| `langfuse` | trace objects with `observations` (e.g. `GET /api/public/traces/{id}`) | `TOOL` observations; `level: ERROR` + `statusMessage` become span errors |
+| `langsmith` | a list of runs | `run_type: tool` runs; `error` becomes a tool error |
+| `braintrust` | a list of logged spans | `span_attributes.type: tool` spans |
+
+Token usage, finish reasons (`context_overflow`), errors (`unrecovered_tool_error`), the user id (`enduser.id`, for `identity` policies) and `metadata.scenario` (scenario key for bands) are carried over where the format records them. [`examples/formats/`](examples/formats/) holds the same refund run in each format; `tests/test_formats.py` checks that all four normalise to identical steps.
+
+### Precheck
+
+Validate an export before you gate on it:
+
+```
+$ faultgate precheck examples/formats/langfuse.json
+precheck: OK · format langfuse · checked 1 of 1 traces · 0 error(s), 0 warning(s)
+```
+
+It reports the detected format, then per trace: duplicate span ids, missing or backwards timestamps, tool calls without a name (errors, exit 2), and missing roots, spans whose parent is not in the export, runs with no prompt, answer or content (warnings, exit 0). It inspects the first 5 traces by default (`--sample N`, `0` for all). On the 30 real benchmark traces from `make demo-real` it passes with warnings: those exports omit the root span.
+
 ## Measured on real agent traces
 
 faultgate reads chat-only OpenTelemetry GenAI traces where tool calls live inside messages (as exported by many agent harnesses), in addition to `execute_tool` spans.
@@ -71,40 +99,40 @@ Run `make demo-real` (first run downloads ~220 MB, ~1 min) to fetch and evaluate
 
 ```
 $ faultgate check .demo/real_traces.json
-trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error
-------------------------------------------------------------------------------------------------------------
-8a224e8eacdd  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-3cf53cafee61  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-0ff67ea879fc  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-0f2709401932  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-a182fd9c1858  ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
-9bf471687b5f  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-16b13ee29724  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-9dc71e9167b0  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-3524b4b6ef7e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-9ca4051344ef  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-56e646e603b2  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-f406d07bd94c  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-012e74b002d9  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-f0cd792c3105  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-7c69e4d47302  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-fadbf538c24a  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-8e611f21829d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-70722761fb7a  FAIL 1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
-4ab9ef2c7e60  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-910a177350e2  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-a585b61b1598  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-3d7d24721847  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-4422dd26b177  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-bff8bb4c1b2e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-e42782af7315  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-53fdb0601422  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-1dff5fc97b54  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-88733a4ec841  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-dc97bf8af1d8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-192bf8092eb8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
+------------------------------------------------------------------------------------------------------------------------------
+8a224e8eacdd  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3cf53cafee61  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+0ff67ea879fc  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+0f2709401932  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+a182fd9c1858  ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00         ok   1.00
+9bf471687b5f  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+16b13ee29724  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+9dc71e9167b0  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+3524b4b6ef7e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+9ca4051344ef  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+56e646e603b2  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+f406d07bd94c  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+012e74b002d9  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+f0cd792c3105  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+7c69e4d47302  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+fadbf538c24a  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+8e611f21829d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+70722761fb7a  FAIL 1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00         ok   1.00
+4ab9ef2c7e60  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+910a177350e2  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+a585b61b1598  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3d7d24721847  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+4422dd26b177  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+bff8bb4c1b2e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+e42782af7315  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+53fdb0601422  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+1dff5fc97b54  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+88733a4ec841  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+dc97bf8af1d8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+192bf8092eb8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
 
-9/30 traces failed · search_loop=2, abstention=0, policy=0, repeated_call=2, unrecovered_tool_error=6 · judge none · 1.1s
+9/30 traces failed · search_loop=2, abstention=0, policy=0, repeated_call=2, unrecovered_tool_error=6, context_overflow=0 · judge none · 2.1s
 ```
 
 Two new checks with measured trust, ported from [FAULTLINE P18](https://github.com/samirsawarkar/faultline-ai-reliability) (`projects/p18_trace_triage`):
@@ -127,6 +155,7 @@ These are public benchmark traces, not production traffic; the P18 sample was st
 | `policy` | rule | A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, call budget, argument limit, identity mismatch, or missing prerequisite. |
 | `repeated_call` | rule | The same tool was called with identical arguments and returned identical results >= 3 times. |
 | `unrecovered_tool_error` | rule | A tool call produced a structural error with no later successful call of the same tool, or a span errored (error.type or status code 2) and no later span made a successful tool call. |
+| `context_overflow` | rule | The run hit the model's context window or output token limit: a span's `gen_ai.response.finish_reasons` says `length` / `max_tokens`, or a provider error naming the context limit (`context_length_exceeded`, "maximum context length", "prompt is too long") in a span status, `error.type`, tool result or `faultgate.termination`. |
 | `wrong_answer` | golden | Answered, and the expected answer is not in the final answer. |
 | `truncation` | golden | The answer has the head of the expected token but not the whole token (`Onyx` for `Onyx-4413`). |
 | `wrong_direction` | judge | On a multi-hop task, the agent walked the dependency chain backwards. |
@@ -161,35 +190,57 @@ Reasons name the step and the values: `step 4: modify_billing_record.customer_id
 
 Semantic injections — the agent *obeying* text it read in a document — are a judge question, not a rule, and are not in this release.
 
+## Data stays local: redaction
+
+`faultgate` reads your traces in memory and writes no trace payloads anywhere. Rules, policy, bands and the local Laya judge never send anything off the machine. Two things can travel: the trace an **API judge** (`litellm:`) reads, and the **reasons** that end up in your terminal, `--json` report, CI logs and PR comments. By default both are masked:
+
+| `--redact` | Masks | Needs |
+|---|---|---|
+| `builtin` (default) | emails, credit cards (Luhn-checked), US SSNs, phone numbers, IPv4/IPv6, API keys, bearer tokens, JWTs | nothing (stdlib regex) |
+| `presidio` | the above plus Presidio's recognisers: person names, locations, more | `pip install 'faultgate[pii]'` and a spaCy model |
+| `off` | nothing | |
+
+Rules always see the raw values (an `identity` policy has to compare the real customer id); only what leaves is masked: `step 2: update_profile.email '<EMAIL>' != session enduser.id '<EMAIL>'`. The report's `redaction` field records which mode ran. On the 30 real benchmark traces from `make demo-real` the built-in masker finds 81 emails, 39 phone numbers and 69 JWT access tokens, all real-looking customer data or credentials; it changes none of the text in the shipped FAULTLINE traces.
+
 ## Regression or noise? Tolerance bands
 
 Agents are not deterministic. FAULTLINE P11 ran the same model on the same 30 inputs five times and got pass rates from 0.60 to 0.87. A fixed threshold turns that into a coin-flip gate. `faultgate` measures your spread instead:
 
 ```
 $ faultgate baseline examples/gate/baseline_glm_run1.json examples/gate/baseline_glm_run2.json --out band.json
+note: 2 baseline runs measure noise poorly; use 3 or more
 examples/gate/baseline_glm_run1.json: 30 traces · clean rate 0.93 · 0.0s
 examples/gate/baseline_glm_run2.json: 30 traces · clean rate 0.93 · 0.0s
 band [0.93, 0.93] over 30 scenarios × 2 runs · 26 clean in every run · written to band.json
 
 $ faultgate check examples/gate/candidate_gpt.json --band band.json
-18/30 traces failed · search_loop=18, abstention=0 · judge none · 0.0s
-gate: FAIL · clean rate 0.40 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+18/30 traces failed · search_loop=18, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
+gate: FAIL · clean rate 0.40 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83 · p=0.000
 regressions (clean in every baseline, not now): r-0208, r-0214, r-0216, r-0224, r-0226, r-0232, r-0258, ...
 
 $ faultgate check examples/gate/candidate_qwen.json --band band.json
-gate: FAIL · clean rate 0.70 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+gate: FAIL · clean rate 0.70 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83 · p=0.005
 
 $ faultgate check examples/gate/baseline_glm_run2.json --band band.json
-gate: PASS · clean rate 0.93 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83
+gate: PASS · clean rate 0.93 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83 · p=0.500
 ```
 
-Real runs: two `z-ai/glm-5.3-flash` baselines and `openai/gpt-5.6-luna` / `qwen/qwen3.7-flash` candidates on the same 30 multi-hop scenarios. The verdicts match FAULTLINE P11's live drill (R4 FAIL / R1 FAIL / R2 PASS), which cost $1.84 and an API judge; this took 0.0 s and no model.
+Real runs (table rows and most stderr notes omitted): two `z-ai/glm-5.3-flash` baselines and `openai/gpt-5.6-luna` / `qwen/qwen3.7-flash` candidates on the same 30 multi-hop scenarios. The verdicts match FAULTLINE P11's live drill (R4 FAIL / R1 FAIL / R2 PASS), which cost $1.84 and an API judge; this took 0.0 s and no model.
 
 | Verdict | Rule (n = scenarios in the band) | Exit |
 |---|---|---|
 | **PASS** | clean rate ≥ min observed − 1/n | 0 |
-| **WARN** | in between — a human should look | 0 |
-| **FAIL** | clean rate < min observed − 3/n | 1 |
+| **FAIL** | clean rate < min observed − 3/n, or below PASS and the drop is significant (one-sided, α = 0.05) | 1 |
+| **INCONCLUSIVE** | in between and not significant: the gate says how many scenarios it would need (power 0.80) | 0 |
+
+In between the two thresholds, the gate tests whether the candidate's clean rate is below the baseline mean. The variance is the binomial noise of both sides plus the run-to-run variance the baseline measured, so a noisy baseline needs a bigger drop to fail. When it cannot tell, it says so and sizes the fix:
+
+```
+gate: INCONCLUSIVE · clean rate 0.93 vs band [1.00, 1.00] from 2 baseline runs · fail below 0.90 · p=0.072
+inconclusive: a drop of 0.07 needs 89 scenarios to tell from noise (alpha 0.05, power 0.80) · run 59 more
+```
+
+(Two failures injected into a run of a baseline that was clean on all 30 scenarios; `tests/test_band.py`.) `required_n` is the standard two-proportion sample size for the observed drop. The gate result in the JSON report carries the same numbers under `stats`. Build the band from 3 or more baseline runs; with 2, the run-to-run variance is a guess and the gate warns.
 
 It also lists **regressions**: scenarios clean in *every* baseline run and not clean now — the ones to read first. Scenarios are matched across runs by `faultgate.scenario`, else `gen_ai.agent.id`, else a hash of the prompt.
 
@@ -202,12 +253,12 @@ examples/gate/baseline_glm_run2.json: 30 traces · clean rate 0.87 · 0.0s      
 band [0.80, 0.87] over 30 scenarios × 2 runs · 21 clean in every run
 
 $ faultgate check examples/gate/candidate_gpt.json --golden examples/gate/golden.json --band band.json
-21/30 traces failed · search_loop=18, abstention=0, policy=0, wrong_answer=3, truncation=3
-gate: FAIL · clean rate 0.30 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70
+21/30 traces failed · search_loop=18, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0, wrong_answer=3, truncation=3 · judge none · 0.0s
+gate: FAIL · clean rate 0.30 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70 · p=0.000
 
 $ faultgate check examples/gate/candidate_qwen.json --golden examples/gate/golden.json --band band.json
-18/30 traces failed · search_loop=9, abstention=0, policy=0, wrong_answer=9, truncation=8
-gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70
+18/30 traces failed · search_loop=9, abstention=0, policy=0, repeated_call=1, unrecovered_tool_error=0, context_overflow=0, wrong_answer=9, truncation=8 · judge none · 0.0s
+gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70 · p=0.000
 ```
 
 (Qwen returns the head of the answer token without its suffix in 8 of 30 runs. Nobody had noticed.)
@@ -223,7 +274,13 @@ gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail 
     policy: traces/policy.json         # optional
 ```
 
-Exit 1 on gate FAIL, so the job fails; WARN and PASS pass. The report lands in `faultgate-report.json` for upload as an artifact. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes.
+Exit 1 on gate FAIL, so the job fails; PASS and INCONCLUSIVE pass (INCONCLUSIVE prints how many more scenarios to run). Every run also:
+
+- writes the Markdown summary to the **job summary**, and on pull requests posts **one PR comment** (updated in place on later pushes, found by its `<!-- faultgate -->` marker): the verdict, gate numbers and p-value, fired checks, the policy hard block with each broken rule, failing traces with the step and reason, the latency / token / cost change against the baseline, and the exact command to reproduce it locally. Give the job `permissions: pull-requests: write`, or set `comment: "false"`;
+- uploads an **audit artifact** (`faultgate-audit`): `verdict.json` (verdict, exit code, faultgate version, UTC time, every input file with its SHA-256, gate numbers), `failing_traces.json` (each failing trace and every reason) and `repro.sh`. No prompts, answers or tool payloads are copied into it, and reasons are masked by `redact`;
+- exposes the verdict as the step output `verdict`.
+
+Other inputs: `format`, `redact`, `checks`, `judge`, `report`, `audit`, `version`. The same files come from the CLI with `--markdown summary.md --audit audit/`. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes, with matching verdict outputs and audit files.
 
 ## How much to trust a verdict
 
@@ -234,6 +291,7 @@ This is the part every evaluation tool skips. Every check and judge here is scor
 | `search_loop` | rule | 36 | 1.00 | 0.99 | **0.98** | **1.00** |
 | `abstention` | rule | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
 | `policy` | rule | synthetic | 4/4 P9 categories | 0 FP on 290 real traces | — | — |
+| `context_overflow` | rule | synthetic | finish-reason and provider-error forms in `tests/test_checks.py` | 0 FP on the 125 shipped real traces | — | — |
 | `wrong_answer` | golden | 4 | 1.00 | 1.00 | 1.00 | 1.00 |
 | `truncation` | golden | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
 | `wrong_direction` | Laya judge | 1 | 1.00 | 0.61 | 0.02 | 0.00 |

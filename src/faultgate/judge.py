@@ -78,6 +78,7 @@ class LiteLLMJudge:
     )
 
     budget = None
+    remote = True  # the rendered trace leaves the machine: it is masked first (see redact.py)
 
     def __init__(self, model: str) -> None:
         self.model = model

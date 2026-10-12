@@ -25,6 +25,8 @@ class Span(BaseModel):
     start_ns: int
     attrs: dict[str, Any]
     status_code: int = 0
+    status_message: str = ""
+    end_ns: int = 0
 
 
 class Step(BaseModel):
@@ -112,6 +114,35 @@ class Trace(BaseModel):
             Step(index=i + 1, tool=st.tool, arguments=st.arguments, result=st.result, span_id=st.span_id)
             for i, st in enumerate(combined)
         ]
+
+    @property
+    def usage(self) -> dict[str, int]:
+        """Token totals over every span (``gen_ai.usage.input_tokens`` / ``output_tokens``); absent keys are left out."""
+        out: dict[str, int] = {}
+        for sp in self.spans:
+            for k in ("input_tokens", "output_tokens"):
+                v = sp.attrs.get(f"gen_ai.usage.{k}")
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    out[k] = out.get(k, 0) + int(v)
+        return out
+
+    @property
+    def latency_ms(self) -> float | None:
+        """Wall time of the run: root span end - start, else last span end - first span start. None without end times."""
+        r = self.root
+        if r and r.end_ns and r.start_ns and r.end_ns >= r.start_ns:
+            return (r.end_ns - r.start_ns) / 1e6
+        ends = [s.end_ns for s in self.spans if s.end_ns]
+        starts = [s.start_ns for s in self.spans if s.start_ns]
+        if ends and starts and max(ends) >= min(starts):
+            return (max(ends) - min(starts)) / 1e6
+        return None
+
+    @property
+    def cost_usd(self) -> float | None:
+        """Sum of ``faultgate.cost_usd`` span attributes (set by the Langfuse / LangSmith adapters), or None."""
+        costs = [s.attrs["faultgate.cost_usd"] for s in self.spans if isinstance(s.attrs.get("faultgate.cost_usd"), (int, float))]
+        return float(sum(costs)) if costs else None
 
     @property
     def has_content(self) -> bool:
@@ -285,6 +316,8 @@ def load_otlp(path: str | Path) -> list[Trace]:
                     start_ns=int(s.get("startTimeUnixNano", 0)),
                     attrs=attrs,
                     status_code=status_code,
+                    status_message=str(st.get("message", "")),
+                    end_ns=int(s.get("endTimeUnixNano", 0)),
                 )
                 by_trace.setdefault(s["traceId"], []).append(span)
                 if "gen_ai.agent.name" in attrs:

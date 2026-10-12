@@ -514,6 +514,47 @@ def unrecovered_tool_error_rule(t: Trace) -> Verdict:
     return Verdict(False, 1.0, "no unrecovered tool errors")
 
 
+CUTOFF_REASONS = {"length", "max_tokens", "max_output_tokens", "model_length", "model_context_window_exceeded"}
+OVERFLOW = re.compile(
+    r"context[ _-]?length[ _-]?exceeded|maximum context length|context[ _-]?window[ _-]?(?:exceeded|overflow)"
+    r"|exceeds?\s+the\s+(?:model'?s\s+)?(?:context|token)\s+(?:window|limit)|prompt is too long|too many (?:input )?tokens"
+    r"|token limit (?:reached|exceeded)|max(?:imum)?[ _-]?tokens? (?:limit )?(?:reached|exceeded)"
+    r"|exceeds?\s+the\s+maximum\s+number\s+of\s+tokens|input is too long for (?:the )?requested model",
+    re.I,
+)
+
+
+def context_overflow_rule(t: Trace) -> Verdict:
+    """The run hit the model's context window or output token limit.
+
+    Two signals, both structural: a span whose ``gen_ai.response.finish_reasons`` says the output was cut
+    (``length``, ``max_tokens``, ...), or a provider error naming the context limit in a span status message,
+    ``error.type``, a tool result that is an error, or the root's ``faultgate.termination``. Text that merely talks about tokens
+    does not count: the phrases are the error forms providers return.
+    """
+    for i, s in enumerate(t.spans, start=1):
+        raw = s.attrs.get("gen_ai.response.finish_reasons")
+        reasons = raw if isinstance(raw, (list, tuple)) else ([] if raw is None else [raw])
+        cut = next((str(r) for r in reasons if str(r).lower() in CUTOFF_REASONS), None)
+        if cut:
+            return Verdict(True, 1.0, f"span {i} ({s.name}) stopped on finish reason {cut!r}: output cut at the token limit")
+        for where, text in (("status", s.status_message), ("error.type", str(s.attrs.get("error.type", "")))):
+            m = OVERFLOW.search(text)
+            if m:
+                return Verdict(True, 1.0, f"span {i} ({s.name}) {where}: {m.group(0)!r}")
+    for st in t.steps:
+        # only results that are errors: a search hit quoting the error text is not an overflow
+        if not (st.result.lstrip().startswith("Error") or _is_structural_error(st.result)[0]):
+            continue
+        m = OVERFLOW.search(st.result)
+        if m:
+            return Verdict(True, 1.0, f"step {st.index} ({st.tool}) result: {m.group(0)!r}")
+    m = OVERFLOW.search(t.termination)
+    if m:
+        return Verdict(True, 1.0, f"run terminated: {m.group(0)!r}")
+    return Verdict(False, 1.0, "no context overflow or token cutoff")
+
+
 CHECKS: dict[str, Check] = {
     c.name: c
     for c in (
@@ -542,6 +583,11 @@ CHECKS: dict[str, Check] = {
             "unrecovered_tool_error",
             "A tool call produced a structural error and the tool was never used successfully afterwards.",
             rule=unrecovered_tool_error_rule,
+        ),
+        Check(
+            "context_overflow",
+            "The run hit the context window or output token limit (finish reason or provider error).",
+            rule=context_overflow_rule,
         ),
         Check(
             "wrong_answer",

@@ -44,6 +44,7 @@ def test_cli_with_golden(tmp_path):
         "policy": 0,
         "repeated_call": 0,
         "unrecovered_tool_error": 0,
+        "context_overflow": 0,
         "wrong_answer": 2,
         "truncation": 1,
     }

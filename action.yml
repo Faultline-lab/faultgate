@@ -2,27 +2,93 @@ name: faultgate
 description: Gate a deploy on recorded agent traces — rule checks, optional band, golden answers and policy. Exit 1 on FAIL.
 branding: { icon: shield, color: red }
 inputs:
-  traces:  { description: "OTLP/JSON trace export to check", required: true }
+  traces:  { description: "trace export to check (OTLP/JSON, OpenInference, Langfuse, LangSmith or Braintrust)", required: true }
   band:    { description: "band.json from `faultgate baseline` (FAIL only outside the measured band)", required: false, default: "" }
   golden:  { description: "golden.json of expected answers", required: false, default: "" }
-  policy:  { description: "policy.json of allowed tools / patterns / budgets", required: false, default: "" }
+  policy:  { description: "policy.json of allowed tools / patterns / budgets / limits / identity / prerequisites", required: false, default: "" }
   checks:  { description: "comma-separated subset of checks", required: false, default: "" }
   judge:   { description: "laya or litellm:<model>; needs the [laya] / [api] extra installed", required: false, default: "" }
+  format:  { description: "trace format (default: detect)", required: false, default: "auto" }
+  redact:  { description: "builtin | presidio | off — masking of PII and secrets in judge input and reasons", required: false, default: "builtin" }
   report:  { description: "path to write the JSON report", required: false, default: "faultgate-report.json" }
+  audit:   { description: "directory for verdict.json, failing_traces.json and repro.sh (uploaded as an artifact)", required: false, default: "faultgate-audit" }
+  comment: { description: "on pull requests, post or update one summary comment (needs pull-requests: write)", required: false, default: "true" }
   version: { description: "faultgate version spec, or a path/VCS spec for pip", required: false, default: "faultgate" }
+outputs:
+  verdict: { description: "PASS, FAIL or INCONCLUSIVE", value: "${{ steps.gate.outputs.verdict }}" }
+# Inputs reach the shell only as environment variables, never spliced into script text.
 runs:
   using: composite
   steps:
     - uses: actions/setup-python@v5
       with: { python-version: "3.12" }
     - shell: bash
-      run: pip install --quiet "${{ inputs.version }}"
-    - shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
       run: |
-        args=(check "${{ inputs.traces }}" --json "${{ inputs.report }}")
-        [ -n "${{ inputs.band }}" ]   && args+=(--band "${{ inputs.band }}")
-        [ -n "${{ inputs.golden }}" ] && args+=(--golden "${{ inputs.golden }}")
-        [ -n "${{ inputs.policy }}" ] && args+=(--policy "${{ inputs.policy }}")
-        [ -n "${{ inputs.checks }}" ] && args+=(--check "${{ inputs.checks }}")
-        [ -n "${{ inputs.judge }}" ]  && args+=(--judge "${{ inputs.judge }}")
+        pip install --quiet "$VERSION"
+    - id: gate
+      shell: bash
+      env:
+        TRACES: ${{ inputs.traces }}
+        REPORT: ${{ inputs.report }}
+        AUDIT: ${{ inputs.audit }}
+        FORMAT: ${{ inputs.format }}
+        REDACT: ${{ inputs.redact }}
+        BAND: ${{ inputs.band }}
+        GOLDEN: ${{ inputs.golden }}
+        POLICY: ${{ inputs.policy }}
+        CHECKS: ${{ inputs.checks }}
+        JUDGE: ${{ inputs.judge }}
+      run: |
+        md="$RUNNER_TEMP/faultgate-summary.md"
+        args=(check "$TRACES" --json "$REPORT" --markdown "$md" --format "$FORMAT" --redact "$REDACT")
+        [ -n "$AUDIT" ]  && args+=(--audit "$AUDIT")
+        [ -n "$BAND" ]   && args+=(--band "$BAND")
+        [ -n "$GOLDEN" ] && args+=(--golden "$GOLDEN")
+        [ -n "$POLICY" ] && args+=(--policy "$POLICY")
+        [ -n "$CHECKS" ] && args+=(--check "$CHECKS")
+        [ -n "$JUDGE" ]  && args+=(--judge "$JUDGE")
+        set +e
         faultgate "${args[@]}"
+        code=$?
+        set -e
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+        if [ -f "$md" ]; then
+          cat "$md" >> "$GITHUB_STEP_SUMMARY"
+          echo "verdict=$(sed -n 's/^## faultgate: //p' "$md" | head -1)" >> "$GITHUB_OUTPUT"
+          echo "summary=$md" >> "$GITHUB_OUTPUT"
+        fi
+    - if: ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && steps.gate.outputs.summary != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+        MD: ${{ steps.gate.outputs.summary }}
+      run: |
+        # one comment per PR, found by its <!-- faultgate --> marker and updated in place.
+        # A comment is a convenience: any API failure (e.g. a fork's read-only token) warns, never fails the job.
+        warn() { echo "::warning::faultgate could not comment on the PR ($1); give the job pull-requests: write"; exit 0; }
+        if ! id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- faultgate -->")) | .id'); then
+          warn "listing comments failed"
+        fi
+        id=$(printf '%s\n' "$id" | head -1)
+        if [ -n "$id" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$MD" > /dev/null || warn "update failed"
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$MD" > /dev/null || warn "create failed"
+        fi
+    - if: ${{ always() && inputs.audit != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: faultgate-audit
+        path: ${{ inputs.audit }}
+        if-no-files-found: ignore
+        overwrite: true
+    - shell: bash
+      env:
+        CODE: ${{ steps.gate.outputs.code }}
+      run: |
+        # no recorded code means the gate did not run: fail closed
+        exit "${CODE:-2}"
