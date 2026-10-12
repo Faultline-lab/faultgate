@@ -27,6 +27,7 @@ jobs:
           traces: examples/gate/candidate_gpt.json
           band: examples/gate/band.json
           golden: examples/gate/golden.json
+          comment: "false"
       - id: baseline
         uses: ./
         with:
@@ -34,4 +35,8 @@ jobs:
           traces: examples/gate/baseline_glm_run2.json
           band: examples/gate/band.json
           golden: examples/gate/golden.json
-      - run: test "${{ steps.regression.outcome }}" = failure && test "${{ steps.baseline.outcome }}" = success
+          comment: "false"
+      - run: |
+          test "${{ steps.regression.outcome }}" = failure && test "${{ steps.baseline.outcome }}" = success
+          test "${{ steps.regression.outputs.verdict }}" = FAIL && test "${{ steps.baseline.outputs.verdict }}" = PASS
+          test -s faultgate-audit/verdict.json && test -s faultgate-audit/repro.sh

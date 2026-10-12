@@ -127,6 +127,24 @@ class Trace(BaseModel):
         return out
 
     @property
+    def latency_ms(self) -> float | None:
+        """Wall time of the run: root span end - start, else last span end - first span start. None without end times."""
+        r = self.root
+        if r and r.end_ns and r.start_ns and r.end_ns >= r.start_ns:
+            return (r.end_ns - r.start_ns) / 1e6
+        ends = [s.end_ns for s in self.spans if s.end_ns]
+        starts = [s.start_ns for s in self.spans if s.start_ns]
+        if ends and starts and max(ends) >= min(starts):
+            return (max(ends) - min(starts)) / 1e6
+        return None
+
+    @property
+    def cost_usd(self) -> float | None:
+        """Sum of ``faultgate.cost_usd`` span attributes (set by the Langfuse / LangSmith adapters), or None."""
+        costs = [s.attrs["faultgate.cost_usd"] for s in self.spans if isinstance(s.attrs.get("faultgate.cost_usd"), (int, float))]
+        return float(sum(costs)) if costs else None
+
+    @property
     def has_content(self) -> bool:
         return bool(self.prompt or self.answer or any(st.arguments or st.result for st in self.steps))
 

@@ -32,6 +32,16 @@ from faultgate.runner import Report
 
 MIN_RUNS = 2
 RECOMMENDED_RUNS = 3
+MEASURES = ("tokens", "latency_ms", "cost_usd")
+
+
+def _mean_measures(reports: list[Report]) -> dict[str, float | None]:
+    """Mean per run of each measure, over every trace that recorded it; None when no trace did."""
+    out: dict[str, float | None] = {}
+    for m in MEASURES:
+        vals = [v[m] for r in reports for v in r.measures.values() if v.get(m) is not None]
+        out[m] = sum(vals) / len(vals) if vals else None
+    return out
 ALPHA = 0.05
 POWER = 0.80
 
@@ -59,6 +69,7 @@ def build(reports: list[Report]) -> dict[str, Any]:
         "scenarios": scenarios,
         "clean_rate": {"min": min(rates), "max": max(rates), "mean": sum(rates) / len(rates), "per_run": rates},
         "clean_in_all_runs": [s for s in scenarios if agreement[s] == len(reports)],
+        "usage": _mean_measures(reports),
         "rule": f"PASS if clean_rate >= min - 1/n; FAIL if clean_rate < min - 3/n or the drop from the baseline mean "
                 f"is significant (one-sided, alpha {ALPHA}); else INCONCLUSIVE with the n needed for power {POWER}",
     }
@@ -126,9 +137,15 @@ def evaluate(report: Report, band: dict[str, Any]) -> dict[str, Any]:
     if runs < RECOMMENDED_RUNS:
         warnings.append(f"band built from {runs} baseline runs; use {RECOMMENDED_RUNS} or more "
                         "for a stable noise estimate")
+    usage = {}
+    cand = _mean_measures([report])
+    for m, base in (band.get("usage") or {}).items():
+        if base and cand.get(m) is not None:
+            usage[m] = {"baseline": base, "candidate": cand[m], "delta_pct": round(100 * (cand[m] - base) / base, 1)}
     return {
         "verdict": verdict,
         "clean_rate": rate,
+        "usage": usage,
         "band": [lo, band["clean_rate"]["max"]],
         "pass_threshold": lo - 1 / n,
         "fail_threshold": lo - 3 / n,

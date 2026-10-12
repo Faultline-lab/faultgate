@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ from faultgate.formats import FORMATS
 from faultgate.formats import load as load_traces
 from faultgate.precheck import DEFAULT_SAMPLE, precheck
 from faultgate.redact import REDACTIONS, get_redactor
+from faultgate.report import display_path, markdown, write_audit
 
 
 def _table(report: Report) -> str:
@@ -111,7 +113,34 @@ def cmd_check(args: argparse.Namespace) -> int:
     if args.json:
         Path(args.json).write_text(json.dumps(out, indent=1), encoding="utf-8")
         print(f"report written to {args.json}")
+    command = _repro(getattr(args, "argv", None) or ["check", args.traces])
+    if args.markdown:
+        Path(args.markdown).write_text(markdown(report, out.get("gate"), band, command), encoding="utf-8")
+        print(f"markdown written to {args.markdown}")
+    if args.audit:
+        inputs = {"traces": args.traces, "band": args.band, "policy": args.policy, "golden": args.golden}
+        write_audit(args.audit, report, out.get("gate"), inputs, command, code)
+        print(f"audit written to {args.audit}")
     return code
+
+
+OUTPUT_FLAGS = {"--json", "--markdown", "--audit"}
+
+
+def _repro(argv: list[str]) -> str:
+    """The command that reproduces this verdict: the same inputs and options, without the output files."""
+    keep, skip = [], False
+    for a in argv:
+        if skip:
+            skip = False
+            continue
+        if a in OUTPUT_FLAGS:
+            skip = True
+            continue
+        if a.split("=", 1)[0] in OUTPUT_FLAGS:
+            continue
+        keep.append(display_path(a) if not a.startswith("-") and Path(a).is_file() else a)
+    return shlex.join(["faultgate", *keep])
 
 
 def cmd_baseline(args: argparse.Namespace) -> int:
@@ -170,6 +199,8 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--judge", default=None, help="enable judge checks: laya or litellm:<model> (default: rules only)")
     c.add_argument("--check", default=None, help="comma-separated subset of checks (default: all)")
     c.add_argument("--json", default=None, help="also write the full report to this path")
+    c.add_argument("--markdown", default=None, help="write a Markdown summary (PR comment / job summary) to this path")
+    c.add_argument("--audit", default=None, help="write verdict.json, failing_traces.json and repro.sh to this directory")
     c.add_argument("--band", default=None, help="band.json from `faultgate baseline`; exit 1 only on FAIL, not on noise")
     c.add_argument("--policy", default=None, help='policy.json: {"allow": [...], "max_calls": N, "max_arg_chars": N, "deny_patterns": [...], '
                                                   '"limits": [...], "identity": {...}, "requires": [...]}; a violation fails the gate even with --band')
@@ -200,7 +231,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    raw = list(sys.argv[1:] if argv is None else argv)
+    args = build_parser().parse_args(raw)
+    args.argv = raw
     return args.fn(args)
 
 

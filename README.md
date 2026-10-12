@@ -44,6 +44,8 @@ faultgate check traces.json --golden golden.json     # expected answers: correct
 faultgate check traces.json --policy policy.json     # what the agent was allowed to do
 faultgate check traces.json --judge laya             # also run judge checks, locally
 faultgate check traces.json --judge litellm:openai/gpt-5.6-luna   # any API model
+faultgate check traces.json --markdown pr.md --audit audit/   # PR comment + audit files
+faultgate precheck traces.json                       # validate an export before gating
 faultgate checks                                     # list checks and their kind
 faultgate judges                                     # list judge specs
 
@@ -272,7 +274,13 @@ gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail 
     policy: traces/policy.json         # optional
 ```
 
-Exit 1 on gate FAIL, so the job fails; PASS and INCONCLUSIVE pass (INCONCLUSIVE prints how many more scenarios to run). The report lands in `faultgate-report.json` for upload as an artifact. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes.
+Exit 1 on gate FAIL, so the job fails; PASS and INCONCLUSIVE pass (INCONCLUSIVE prints how many more scenarios to run). Every run also:
+
+- writes the Markdown summary to the **job summary**, and on pull requests posts **one PR comment** (updated in place on later pushes, found by its `<!-- faultgate -->` marker): the verdict, gate numbers and p-value, fired checks, the policy hard block with each broken rule, failing traces with the step and reason, the latency / token / cost change against the baseline, and the exact command to reproduce it locally. Give the job `permissions: pull-requests: write`, or set `comment: "false"`;
+- uploads an **audit artifact** (`faultgate-audit`): `verdict.json` (verdict, exit code, faultgate version, UTC time, every input file with its SHA-256, gate numbers), `failing_traces.json` (each failing trace and every reason) and `repro.sh`. No prompts, answers or tool payloads are copied into it, and reasons are masked by `redact`;
+- exposes the verdict as the step output `verdict`.
+
+Other inputs: `format`, `redact`, `checks`, `judge`, `report`, `audit`, `version`. The same files come from the CLI with `--markdown summary.md --audit audit/`. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes, with matching verdict outputs and audit files.
 
 ## How much to trust a verdict
 
