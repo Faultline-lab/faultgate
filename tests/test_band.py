@@ -87,6 +87,41 @@ def test_cli_inconclusive_exits_0_and_says_how_many(monkeypatch, tmp_path, capsy
     assert code == 0 and "gate: INCONCLUSIVE" in text and "needs 89 scenarios" in text and "run 59 more" in text
 
 
+def _band(per_run, n=30, **clean_rate):
+    rate = {"min": min(per_run), "max": max(per_run), "mean": sum(per_run) / len(per_run), "per_run": per_run, **clean_rate}
+    return {"judge": "none", "checks": [], "runs": len(per_run), "n": n, "scenarios": [f"s{i}" for i in range(n)],
+            "clean_rate": rate, "clean_in_all_runs": []}
+
+
+def test_stats_edge_cases():
+    # zero variance everywhere (se = 0): a drop is certain, no drop is not
+    s = band.stats(0.0, 30, _band([1.0, 1.0]))
+    assert s["p_value"] == 0.0 and s["drop"] == 1.0 and s["required_n"] >= 1
+    s = band.stats(1.0, 30, _band([1.0, 1.0]))
+    assert s["p_value"] == 1.0 and s["required_n"] is None and s["additional_n"] is None
+    s = band.stats(0.0, 30, _band([0.0, 0.0]))
+    assert s["p_value"] == 1.0 and s["drop"] == 0
+    # candidate better than the baseline mean: never significant, nothing to size
+    s = band.stats(0.95, 30, _band([0.8, 0.9]))
+    assert s["p_value"] > 0.5 and s["required_n"] is None
+    # tiny n: a one-scenario drop is far from significant
+    assert band.stats(2 / 3, 3, _band([1.0, 1.0], n=3))["p_value"] > band.ALPHA
+    # a single baseline run has no run-to-run variance to add
+    assert band.stats(0.8, 30, _band([0.9]))["p_value"] > band.stats(0.8, 30, _band([0.9, 0.9, 0.9]))["p_value"]
+
+
+def test_legacy_band_without_per_run():
+    """band.json files without clean_rate.per_run fall back to [min, max] (the observed spread)."""
+    legacy = _band([0.8, 0.9])
+    del legacy["clean_rate"]["per_run"]
+    r1 = _report(GATE / "baseline_glm_run1.json", {})
+    legacy["scenarios"] = sorted(r1.clean_by_scenario)
+    legacy["n"] = len(legacy["scenarios"])
+    g = band.evaluate(r1, legacy)
+    assert g["verdict"] == "PASS" and g["stats"]["baseline_mean"] == pytest.approx(0.85)
+    assert any("3 or more" in w for w in g["warnings"])
+
+
 def test_noise_widens_the_test():
     """Run-to-run spread in the baseline makes the same drop less significant."""
     tight = {"judge": "none", "checks": [], "runs": 3, "n": 30, "scenarios": [f"s{i}" for i in range(30)],
