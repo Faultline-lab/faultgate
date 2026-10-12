@@ -12,14 +12,16 @@ scripts/calibrate.py.
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 from faultgate.judge import Verdict
-from faultgate.trace import Span, Trace
+from faultgate.trace import Span, Step, Trace
 
 STEP_CAP_WORDS = ("step cap", "step limit", "max steps", "max_steps", "max iterations", "iteration limit")
 
@@ -94,29 +96,189 @@ def abstention_rule(t: Trace) -> Verdict:
 
 
 @dataclass(frozen=True)
+class Limit:
+    """A numeric floor/ceiling on one tool argument, e.g. issue_refund.amount <= 500."""
+    tool: str
+    arg: str                    # dotted path into the JSON arguments
+    min: float | None = None
+    max: float | None = None
+
+
+@dataclass(frozen=True)
+class Identity:
+    """A tool argument that must equal the run's authenticated principal (a root span attribute)."""
+    arg: str
+    session_attr: str = "enduser.id"
+    tools: frozenset[str] | None = None  # None: every tool
+
+
+@dataclass(frozen=True)
+class Requirement:
+    """``tool`` may only run after an earlier ``after`` call (whose result contains ``result_contains``, if set)."""
+    tool: str
+    after: str
+    result_contains: str | None = None
+
+
+def _is_num(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _shape(where: str, d: Any, required: set[str], optional: set[str]) -> dict[str, Any]:
+    if not isinstance(d, dict):
+        raise ValueError(f"policy: {where} must be an object")
+    missing = required - set(d)
+    if missing:
+        raise ValueError(f"policy: {where} needs {' and '.join(sorted(f'{k!r}' for k in missing))}")
+    unknown = set(d) - required - optional
+    if unknown:
+        raise ValueError(f"policy: {where} has unknown keys {sorted(unknown)}")
+    for k in (required | optional) & set(d):
+        if k in ("min", "max"):
+            if not _is_num(d[k]):
+                raise ValueError(f"policy: {where}.{k} must be a number")
+        elif k == "tools":
+            if not isinstance(d[k], list) or not all(isinstance(x, str) for x in d[k]):
+                raise ValueError(f"policy: {where}.tools must be a list of tool names")
+        elif not isinstance(d[k], str):
+            raise ValueError(f"policy: {where}.{k} must be a string")
+    return d
+
+
+def _items(d: dict[str, Any], key: str) -> list[Any]:
+    v = d.get(key, [])
+    if not isinstance(v, list):
+        raise ValueError(f"policy: {key} must be a list")
+    return v
+
+
+@dataclass(frozen=True)
 class Policy:
     """What the agent was allowed to do. Ported from FAULTLINE P16's RuntimePolicy, applied after the fact.
 
     ``allow``/``max_calls``/``max_arg_chars`` are off until you set them (a policy.json);
     ``deny_patterns`` catches path traversal and local-file reads out of the box.
+    ``limits``/``identity``/``requires`` are business rules on argument values and tool order;
+    each fails closed when it cannot be checked.
     """
     allow: frozenset[str] | None = None
     max_calls: int | None = None
     max_arg_chars: int | None = None
     deny_patterns: tuple[str, ...] = (r"\.\./", r"file://", r"/etc/(passwd|shadow)", r"~/\.ssh", r"/proc/")
+    limits: tuple[Limit, ...] = ()
+    identity: Identity | None = None
+    requires: tuple[Requirement, ...] = ()
 
     @classmethod
     def load(cls, path: str | Path) -> "Policy":
-        d = json.loads(Path(path).read_text(encoding="utf-8"))
-        unknown = set(d) - {"allow", "max_calls", "max_arg_chars", "deny_patterns"}
+        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "Policy":
+        unknown = set(d) - {"allow", "max_calls", "max_arg_chars", "deny_patterns", "limits", "identity", "requires"}
         if unknown:
             raise ValueError(f"policy: unknown keys {sorted(unknown)}")
+        limits = []
+        for i, x in enumerate(_items(d, "limits")):
+            x = _shape(f"limits[{i}]", x, {"tool", "arg"}, {"min", "max"})
+            if "min" not in x and "max" not in x:
+                raise ValueError(f"policy: limits[{i}] needs 'min' or 'max'")
+            if "min" in x and "max" in x and x["min"] > x["max"]:
+                raise ValueError(f"policy: limits[{i}] min {x['min']} > max {x['max']}")
+            limits.append(Limit(x["tool"], x["arg"], x.get("min"), x.get("max")))
+        identity = None
+        if "identity" in d:
+            x = _shape("identity", d["identity"], {"arg"}, {"session_attr", "tools"})
+            identity = Identity(x["arg"], x.get("session_attr", "enduser.id"),
+                                frozenset(x["tools"]) if "tools" in x else None)
+        requires = [
+            Requirement(x["tool"], x["after"], x.get("result_contains"))
+            for i, x in enumerate(_shape(f"requires[{i}]", r, {"tool", "after"}, {"result_contains"})
+                                  for i, r in enumerate(_items(d, "requires")))
+        ]
         return cls(
             allow=frozenset(d["allow"]) if "allow" in d else None,
             max_calls=d.get("max_calls"),
             max_arg_chars=d.get("max_arg_chars"),
             deny_patterns=tuple(d.get("deny_patterns", cls.deny_patterns)),
+            limits=tuple(limits),
+            identity=identity,
+            requires=tuple(requires),
         )
+
+
+_ABSENT = object()
+
+
+def _dig(args: dict[str, Any], path: str) -> Any:
+    cur: Any = args
+    for part in path.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return _ABSENT
+        cur = cur[part]
+    return cur
+
+
+def _number(v: Any) -> float | None:
+    """A JSON number, or a string like ' $1,200.50 '. Booleans and non-finite values are not numbers."""
+    if _is_num(v):
+        return float(v) if math.isfinite(v) else None
+    if isinstance(v, str):
+        s = v.strip().removeprefix("$").replace(",", "")
+        try:
+            f = float(s)
+        except ValueError:
+            return None
+        return f if math.isfinite(f) else None
+    return None
+
+
+def _args_object(arguments: str) -> dict[str, Any] | None:
+    try:
+        d = json.loads(arguments)
+    except ValueError:
+        return None
+    return d if isinstance(d, dict) else None
+
+
+def _business_violations(t: Trace, st: Step, earlier: list[Step], policy: Policy) -> list[str]:
+    bad: list[str] = []
+    args = _args_object(st.arguments)
+    for lim in policy.limits:
+        if st.tool != lim.tool:
+            continue
+        if args is None:
+            bad.append(f"step {st.index}: {st.tool} arguments are not a JSON object, cannot check {lim.arg}")
+            continue
+        raw = _dig(args, lim.arg)
+        if raw is _ABSENT:
+            continue
+        n = _number(raw)
+        if n is None:
+            bad.append(f"step {st.index}: {st.tool}.{lim.arg} {raw!r} is not a number")
+        elif lim.max is not None and n > lim.max:
+            bad.append(f"step {st.index}: {st.tool}.{lim.arg} {n:g} > max {lim.max:g}")
+        elif lim.min is not None and n < lim.min:
+            bad.append(f"step {st.index}: {st.tool}.{lim.arg} {n:g} < min {lim.min:g}")
+    ident = policy.identity
+    if ident and (ident.tools is None or st.tool in ident.tools) and args is not None:
+        raw = _dig(args, ident.arg)
+        if raw is not _ABSENT:
+            root = t.root
+            session = root.attrs.get(ident.session_attr) if root else None
+            if session is None:
+                bad.append(f"step {st.index}: cannot verify {ident.arg}, root span has no {ident.session_attr}")
+            elif str(raw).strip() != str(session).strip():
+                bad.append(f"step {st.index}: {st.tool}.{ident.arg} {str(raw).strip()!r} != session "
+                           f"{ident.session_attr} {str(session).strip()!r}")
+    for req in policy.requires:
+        if st.tool != req.tool:
+            continue
+        if not any(e.tool == req.after and (req.result_contains is None or req.result_contains in e.result)
+                   for e in earlier):
+            cond = f" returned {req.result_contains!r}" if req.result_contains is not None else ""
+            bad.append(f"step {st.index}: {st.tool} before {req.after}{cond}")
+    return bad
 
 
 def policy_rule(t: Trace, policy: Policy) -> Verdict:
@@ -124,7 +286,7 @@ def policy_rule(t: Trace, policy: Policy) -> Verdict:
     steps = t.steps
     bad: list[str] = []
     deny = [re.compile(p, re.I) for p in policy.deny_patterns]
-    for st in steps:
+    for i, st in enumerate(steps):
         if policy.allow is not None and st.tool not in policy.allow:
             bad.append(f"step {st.index}: tool {st.tool!r} not in allowlist")
         for rx in deny:
@@ -133,6 +295,7 @@ def policy_rule(t: Trace, policy: Policy) -> Verdict:
                 break
         if policy.max_arg_chars is not None and len(st.arguments) > policy.max_arg_chars:
             bad.append(f"step {st.index}: arguments {len(st.arguments)} chars > {policy.max_arg_chars}")
+        bad += _business_violations(t, st, steps[:i], policy)
     if policy.max_calls is not None and len(steps) > policy.max_calls:
         bad.append(f"{len(steps)} tool calls > max {policy.max_calls}")
     return Verdict(bool(bad), 1.0, "; ".join(bad) if bad else f"{len(steps)} calls within policy")
@@ -355,7 +518,8 @@ CHECKS: dict[str, Check] = {
         ),
         Check(
             "policy",
-            "A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, or call budget.",
+            "A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, call budget, "
+            "argument limit, identity mismatch, or missing prerequisite.",
             rule=partial(policy_rule, policy=Policy()),
         ),
         Check(

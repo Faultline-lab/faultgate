@@ -45,6 +45,11 @@ class Report:
     def for_trace(self, trace_id: str) -> list[Verdict]:
         return [r.verdict for r in self.results if r.trace_id == trace_id]
 
+    def fired_on(self, check: str) -> list[str]:
+        """Trace ids where ``check`` fired, in report order."""
+        hit = {r.trace_id for r in self.results if r.check == check and r.verdict.detected}
+        return [t for t in self.trace_ids if t in hit]
+
     @property
     def fired(self) -> dict[str, int]:
         counts = {c: 0 for c in self.checks}

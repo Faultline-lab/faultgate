@@ -10,6 +10,10 @@ same scenario set; a candidate is judged against the *observed* spread:
     WARN  otherwise
 
 plus the list of scenarios that were clean in every baseline and are not now.
+
+A policy violation is a hard block: any trace where the ``policy`` check fired
+makes the verdict FAIL whatever the clean rate. Noise explains a flaky answer;
+it does not explain a refund over the limit.
 """
 from __future__ import annotations
 
@@ -55,7 +59,8 @@ def evaluate(report: Report, band: dict[str, Any]) -> dict[str, Any]:
     rate = sum(clean.get(s, False) for s in scenarios) / n
     lo = band["clean_rate"]["min"]
     eps = 1e-9
-    if rate < lo - 3 / n - eps:
+    violations = report.fired_on("policy")
+    if violations or rate < lo - 3 / n - eps:
         verdict = "FAIL"
     elif rate >= lo - 1 / n - eps:
         verdict = "PASS"
@@ -74,5 +79,6 @@ def evaluate(report: Report, band: dict[str, Any]) -> dict[str, Any]:
         "fail_threshold": lo - 3 / n,
         "regressions": [s for s in band["clean_in_all_runs"] if not clean.get(s, False)],
         "missing": missing,
+        "policy_violations": violations,
         "warnings": warnings,
     }

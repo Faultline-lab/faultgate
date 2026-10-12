@@ -1,0 +1,12 @@
+{
+ "allow": ["lookup_order", "verify_customer_identity", "issue_refund", "modify_billing_record"],
+ "max_calls": 20,
+ "limits": [
+  {"tool": "issue_refund", "arg": "amount", "min": 0, "max": 500}
+ ],
+ "identity": {"arg": "customer_id", "session_attr": "enduser.id", "tools": ["issue_refund", "modify_billing_record"]},
+ "requires": [
+  {"tool": "modify_billing_record", "after": "verify_customer_identity", "result_contains": "VERIFIED"},
+  {"tool": "issue_refund", "after": "lookup_order"}
+ ]
+}

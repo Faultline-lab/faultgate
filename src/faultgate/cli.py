@@ -96,6 +96,8 @@ def cmd_check(args: argparse.Namespace) -> int:
         lo, hi = g["band"]
         print(f"gate: {g['verdict']} · clean rate {g['clean_rate']:.2f} vs band [{lo:.2f}, {hi:.2f}] from {band['runs']} baseline runs"
               f" · fail below {g['fail_threshold']:.2f}")
+        if g["policy_violations"]:
+            print(f"gate: FAIL · policy violation in {len(g['policy_violations'])} trace(s) (hard block)")
         if g["regressions"]:
             print(f"regressions (clean in every baseline, not now): {', '.join(g['regressions'])}")
         code = 1 if g["verdict"] == "FAIL" else 0
@@ -148,7 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--check", default=None, help="comma-separated subset of checks (default: all)")
     c.add_argument("--json", default=None, help="also write the full report to this path")
     c.add_argument("--band", default=None, help="band.json from `faultgate baseline`; exit 1 only on FAIL, not on noise")
-    c.add_argument("--policy", default=None, help='policy.json: {"allow": [...], "max_calls": N, "max_arg_chars": N, "deny_patterns": [...]}')
+    c.add_argument("--policy", default=None, help='policy.json: {"allow": [...], "max_calls": N, "max_arg_chars": N, "deny_patterns": [...], '
+                                                  '"limits": [...], "identity": {...}, "requires": [...]}; a violation fails the gate even with --band')
     c.add_argument("--golden", default=None, help="golden.json: {scenario key or prompt: expected answer}; enables wrong_answer and truncation")
     c.set_defaults(fn=cmd_check)
     b = sub.add_parser("baseline", help="build a tolerance band from >= 2 baseline runs of the same scenarios")

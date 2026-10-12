@@ -1,3 +1,4 @@
+import dataclasses
 import json
 
 import pytest
@@ -176,7 +177,8 @@ def test_old_policy_file_unchanged():
 def test_support_example_policy_no_false_positives_from_new_keys():
     pol = Policy.load(EXAMPLES.parent / "policy_support.json")
     assert pol.limits and pol.identity and pol.requires and pol.allow
+    business_only = dataclasses.replace(pol, allow=None, max_calls=None)  # the support tools never appear in these runs
     files = [EXAMPLES, *sorted(GATE.glob("baseline_*.json")), *sorted(GATE.glob("candidate_*.json"))]
-    for t in (t for f in files for t in load_otlp(f)):
-        reasons = policy_rule(t, pol).reason.split("; ")
-        assert all("not in allowlist" in r or "within policy" in r for r in reasons), reasons
+    traces = [t for f in files for t in load_otlp(f)]
+    assert len(traces) > 100
+    assert not [policy_rule(t, business_only).reason for t in traces if policy_rule(t, business_only).detected]
