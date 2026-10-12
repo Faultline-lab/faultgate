@@ -116,6 +116,15 @@ def test_limits_fail_closed_on_non_object_arguments():
     assert v.detected and "not a JSON object" in v.reason
 
 
+def test_double_encoded_and_empty_arguments():
+    # JSON encoded twice is decoded, not waved through
+    assert policy_rule(_run([("issue_refund", json.dumps(json.dumps({"amount": 900})))]), REFUND).detected
+    assert not policy_rule(_run([("issue_refund", json.dumps(json.dumps({"amount": 9})))]), REFUND).detected
+    # no arguments at all means the argument is absent, not unreadable
+    assert not policy_rule(_run([("issue_refund", "")]), REFUND).detected
+    assert not policy_rule(_run([("issue_refund", "  ")]), REFUND).detected
+
+
 IDENT = _policy(identity={"arg": "customer_id", "tools": ["modify_billing_record"]})
 AUTH = {"enduser.id": "C-123"}
 
@@ -132,6 +141,16 @@ def test_identity():
     every_tool = _policy(identity={"arg": "customer_id", "session_attr": "app.customer"})
     assert policy_rule(_run([("lookup", {"customer_id": 7})], {"app.customer": "8"}), every_tool).detected
     assert not policy_rule(_run([("lookup", {"customer_id": 7})], {"app.customer": " 7 "}), every_tool).detected
+
+
+def test_identity_fails_closed_on_unreadable_arguments():
+    # a listed tool whose arguments cannot be read is not verified
+    v = policy_rule(_run([("modify_billing_record", "customer_id=C-999")], AUTH), IDENT)
+    assert v.detected and v.reason == "step 1: modify_billing_record arguments are not a JSON object, cannot check customer_id"
+    # unlisted-tools mode: only when the argument name shows up in the unreadable text
+    every_tool = _policy(identity={"arg": "customer_id"})
+    assert policy_rule(_run([("lookup", "customer_id=C-999")], AUTH), every_tool).detected
+    assert not policy_rule(_run([("search", "free text query")], AUTH), every_tool).detected
 
 
 REQ = _policy(requires=[{"tool": "modify_billing_record", "after": "verify_customer_identity", "result_contains": "VERIFIED"}])
@@ -158,6 +177,9 @@ def test_requires():
     {"limits": [{"tool": "x", "arg": "a", "min": 5, "max": 1}]},
     {"limits": [{"tool": "x", "arg": "a", "max": "500"}]},
     {"limits": [{"tool": "x", "arg": "a", "max": 1, "maxx": 2}]},
+    {"limits": [{"tool": "x", "arg": "a", "max": float("nan")}]},
+    {"limits": [{"tool": "x", "arg": "a", "max": float("inf")}]},
+    {"limits": [{"tool": "x", "arg": "a", "min": float("-inf")}]},
     {"identity": {"tools": ["x"]}},
     {"identity": {"arg": "a", "tools": "x"}},
     {"requires": [{"tool": "x"}]},
@@ -172,6 +194,34 @@ def test_malformed_new_keys_raise(tmp_path, bad):
 
 def test_old_policy_file_unchanged():
     assert Policy.load(GATE / "policy.json") == FAULTLINE_POLICY
+
+
+SUPPORT_OK = [
+    ("lookup_order", {"order_id": "o-7"}, '{"total": 120}'),
+    ("verify_customer_identity", {"customer_id": "C-123"}, '{"status": "VERIFIED"}'),
+    ("issue_refund", {"customer_id": "C-123", "amount": "$120.00"}),
+    ("modify_billing_record", {"customer_id": "C-123", "plan": "basic"}),
+]
+
+
+@pytest.mark.parametrize("step, change, expected", [
+    (None, None, None),
+    (2, {"amount": 900}, "step 3: issue_refund.amount 900 > max 500"),
+    (2, {"customer_id": "C-999"}, "step 3: issue_refund.customer_id 'C-999' != session enduser.id 'C-123'"),
+])
+def test_support_example_policy_on_a_support_run(step, change, expected):
+    """The shipped example policy on a realistic support run: compliant passes, each violation is named."""
+    pol = Policy.load(EXAMPLES.parent / "policy_support.json")
+    calls = [list(c) for c in SUPPORT_OK]
+    if step is not None:
+        calls[step][1] = {**calls[step][1], **change}
+    v = policy_rule(_run([tuple(c) for c in calls], AUTH), pol)
+    assert v.detected is (expected is not None), v.reason
+    if expected:
+        assert v.reason == expected
+    # skipping verification breaks the billing prerequisite
+    v = policy_rule(_run([SUPPORT_OK[0], SUPPORT_OK[2], SUPPORT_OK[3]], AUTH), pol)
+    assert v.reason == "step 3: modify_billing_record before verify_customer_identity returned 'VERIFIED'"
 
 
 def test_support_example_policy_no_false_positives_from_new_keys():
