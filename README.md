@@ -61,7 +61,7 @@ An [OTLP/JSON](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)
 | root `invoke_agent` | `gen_ai.agent.name`, `gen_ai.input.messages` (the user prompt), `gen_ai.output.messages` (the final answer), optional `faultgate.termination` (why the run stopped, e.g. `step cap`) |
 | child `execute_tool` | `gen_ai.tool.name`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
 
-Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](https://github.com/samirsawarkar/faultgate/blob/main/examples/traces.json) is a complete reference file.
+Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](https://github.com/Faultline-lab/faultgate/blob/main/examples/traces.json) is a complete reference file.
 
 ## Measured on real agent traces
 
@@ -197,7 +197,7 @@ gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail 
 ## In CI
 
 ```yaml
-- uses: samirsawarkar/faultgate@main
+- uses: Faultline-lab/faultgate@main
   with:
     traces: traces/candidate.json      # exported by your agent's OTel pipeline
     band: traces/band.json             # from `faultgate baseline`, committed
