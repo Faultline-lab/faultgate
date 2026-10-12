@@ -45,15 +45,62 @@ def test_build_and_evaluate():
     assert set(g["regressions"]) == set(b["clean_in_all_runs"])
 
 
-def test_pass_warn_fail_zones():
+def test_pass_inconclusive_fail_zones():
     r1 = _report(GATE / "baseline_glm_run1.json", {})
     r2 = _report(GATE / "baseline_glm_run2.json", {})
     b = band.build([r1, r2])  # every scenario clean: min 1.0, n=30 -> PASS >= 29/30, FAIL < 27/30
     prompts = [t.prompt for t in load_otlp(GATE / "baseline_glm_run1.json")]
-    for k, expected in ((1, "PASS"), (2, "WARN"), (4, "FAIL")):
+    # k=3 (0.90) used to be WARN; the one-sided test now calls it (p ~ 0.034 < 0.05)
+    for k, expected in ((1, "PASS"), (2, "INCONCLUSIVE"), (3, "FAIL"), (4, "FAIL")):
         g = band.evaluate(_report(GATE / "baseline_glm_run1.json", {"DIRECTION": prompts[:k]}), b)
         assert g["verdict"] == expected, (k, g)
         assert len(g["regressions"]) == k
+
+
+def test_inconclusive_reports_required_n():
+    r1 = _report(GATE / "baseline_glm_run1.json", {})
+    b = band.build([r1, _report(GATE / "baseline_glm_run2.json", {})])
+    prompts = [t.prompt for t in load_otlp(GATE / "baseline_glm_run1.json")]
+    g = band.evaluate(_report(GATE / "baseline_glm_run1.json", {"DIRECTION": prompts[:2]}), b)
+    s = g["stats"]
+    assert g["verdict"] == "INCONCLUSIVE"
+    assert s["alpha"] == 0.05 and s["power"] == 0.80
+    assert 0.05 < s["p_value"] < 0.10
+    # two-proportion sample size, p_b = 1.0 vs p_c = 28/30: 89 scenarios, 59 more than the 30 run
+    assert s["required_n"] == 89 and s["additional_n"] == 59
+    for v in ("PASS", "FAIL"):
+        k = 0 if v == "PASS" else 4
+        g = band.evaluate(_report(GATE / "baseline_glm_run1.json", {"DIRECTION": prompts[:k]}), b)
+        assert g["verdict"] == v and g["stats"]["required_n"] is None
+
+
+def test_cli_inconclusive_exits_0_and_says_how_many(monkeypatch, tmp_path, capsys):
+    prompts = [t.prompt for t in load_otlp(GATE / "baseline_glm_run1.json")]
+    out = tmp_path / "band.json"
+    monkeypatch.setattr(cli, "get_judge", lambda spec: FakeJudge())
+    assert cli.main(["baseline", str(GATE / "baseline_glm_run1.json"), str(GATE / "baseline_glm_run2.json"),
+                     "--check", JUDGE_ONLY, "--judge", "fake", "--out", str(out)]) == 0
+    assert "use 3 or more" in capsys.readouterr().err
+    monkeypatch.setattr(cli, "get_judge", lambda spec: FakeJudge(fire_on={"DIRECTION": prompts[:2]}))
+    code = cli.main(["check", str(GATE / "baseline_glm_run1.json"), "--check", JUDGE_ONLY, "--judge", "fake", "--band", str(out)])
+    text = capsys.readouterr().out
+    assert code == 0 and "gate: INCONCLUSIVE" in text and "needs 89 scenarios" in text and "run 59 more" in text
+
+
+def test_noise_widens_the_test():
+    """Run-to-run spread in the baseline makes the same drop less significant."""
+    tight = {"judge": "none", "checks": [], "runs": 3, "n": 30, "scenarios": [f"s{i}" for i in range(30)],
+             "clean_rate": {"min": 0.9, "max": 0.9, "mean": 0.9, "per_run": [0.9, 0.9, 0.9]}, "clean_in_all_runs": []}
+    noisy = {**tight, "clean_rate": {"min": 0.8, "max": 1.0, "mean": 0.9, "per_run": [0.8, 0.9, 1.0]}}
+    assert band.stats(0.8, 30, tight)["p_value"] < band.stats(0.8, 30, noisy)["p_value"]
+
+
+def test_band_from_fewer_than_three_runs_warns():
+    r1 = _report(GATE / "baseline_glm_run1.json", {})
+    b = band.build([r1, _report(GATE / "baseline_glm_run2.json", {})])
+    assert any("3 or more" in w for w in band.evaluate(r1, b)["warnings"])
+    b3 = band.build([r1, r1, r1])
+    assert not any("3 or more" in w for w in band.evaluate(r1, b3)["warnings"])
 
 
 def test_build_rejects_bad_input():
@@ -74,7 +121,7 @@ def test_cli_baseline_then_gate(monkeypatch, tmp_path, capsys):
     rep = tmp_path / "r.json"
     code = cli.main(["check", str(GATE / "baseline_glm_run2.json"), "--check", JUDGE_ONLY, "--judge", "fake", "--band", str(out), "--json", str(rep)])
     text = capsys.readouterr().out
-    assert code == 0 and "gate: PASS" in text
+    assert code == 0 and "gate: PASS" in text and " · p=" in text
     assert json.loads(rep.read_text())["gate"]["verdict"] == "PASS"
     assert cli.main(["baseline", str(GATE / "baseline_glm_run1.json"), "--judge", "fake", "--out", str(out)]) == 2
 
