@@ -116,6 +116,17 @@ class Trace(BaseModel):
         ]
 
     @property
+    def usage(self) -> dict[str, int]:
+        """Token totals over every span (``gen_ai.usage.input_tokens`` / ``output_tokens``); absent keys are left out."""
+        out: dict[str, int] = {}
+        for sp in self.spans:
+            for k in ("input_tokens", "output_tokens"):
+                v = sp.attrs.get(f"gen_ai.usage.{k}")
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    out[k] = out.get(k, 0) + int(v)
+        return out
+
+    @property
     def has_content(self) -> bool:
         return bool(self.prompt or self.answer or any(st.arguments or st.result for st in self.steps))
 

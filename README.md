@@ -63,6 +63,31 @@ An [OTLP/JSON](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)
 
 Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](https://github.com/samirsawarkar/faultgate/blob/main/examples/traces.json) is a complete reference file.
 
+### Other trace formats
+
+`faultgate` also reads the exports of the common agent-observability tools and maps them onto the same attributes, so every check, policy and judge works unchanged. The format is detected; force it with `--format`.
+
+| `--format` | Export | Steps come from |
+|---|---|---|
+| `otlp` | OTLP/JSON, GenAI semantic conventions | `execute_tool` spans and tool calls inside chat messages |
+| `openinference` | OTLP with `openinference.span.kind` (Arize Phoenix) | `TOOL` spans: `tool.name`, `tool.parameters` or `input.value`, `output.value` |
+| `langfuse` | trace objects with `observations` (e.g. `GET /api/public/traces/{id}`) | `TOOL` observations; `level: ERROR` + `statusMessage` become span errors |
+| `langsmith` | a list of runs | `run_type: tool` runs; `error` becomes a tool error |
+| `braintrust` | a list of logged spans | `span_attributes.type: tool` spans |
+
+Token usage, finish reasons (`context_overflow`), errors (`unrecovered_tool_error`), the user id (`enduser.id`, for `identity` policies) and `metadata.scenario` (scenario key for bands) are carried over where the format records them. [`examples/formats/`](examples/formats/) holds the same refund run in each format; `tests/test_formats.py` checks that all four normalise to identical steps.
+
+### Precheck
+
+Validate an export before you gate on it:
+
+```
+$ faultgate precheck examples/formats/langfuse.json
+precheck: OK · format langfuse · checked 1 of 1 traces · 0 error(s), 0 warning(s)
+```
+
+It reports the detected format, then per trace: duplicate span ids, missing or backwards timestamps, tool calls without a name (errors, exit 2), and missing roots, spans whose parent is not in the export, runs with no prompt, answer or content (warnings, exit 0). It inspects the first 5 traces by default (`--sample N`, `0` for all). On the 30 real benchmark traces from `make demo-real` it passes with warnings: those exports omit the root span.
+
 ## Measured on real agent traces
 
 faultgate reads chat-only OpenTelemetry GenAI traces where tool calls live inside messages (as exported by many agent harnesses), in addition to `execute_tool` spans.

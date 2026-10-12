@@ -6,6 +6,9 @@
 - Hard block: with `--band`, any `policy` violation makes the gate FAIL regardless of clean rate; the gate result lists `policy_violations`.
 - `examples/policy_support.json`: a customer-support policy using every key.
 - New default rule `context_overflow`: the run hit the context window or output token limit (`gen_ai.response.finish_reasons` `length` / `max_tokens`, or a provider context-limit error in a span status message, `error.type`, tool result or `faultgate.termination`). 0 detections on the 125 shipped real traces and the 30-trace `make demo-real` sample. Spans now keep `status.message` and `endTimeUnixNano`. The default report gains a column.
+- Trace formats: `--format auto|otlp|openinference|langfuse|langsmith|braintrust` on `check` and `baseline` (detected by default). Each vendor export is mapped onto the GenAI span model, carrying tool calls, errors, finish reasons, token usage, user id and scenario. Examples in `examples/formats/`.
+- `faultgate precheck`: validates an export (format, roots, duplicate span ids, dangling parents, timestamps, unnamed tool calls, missing content) on the first 5 traces (`--sample`); exit 2 on errors.
+- `Trace.usage`: token totals across spans.
 - Gate statistics: **WARN is replaced by INCONCLUSIVE.** Between the PASS and FAIL thresholds the gate now runs a one-sided test against the baseline mean (binomial noise of both sides plus measured run-to-run variance); a significant drop (α 0.05) is FAIL, otherwise INCONCLUSIVE with `required_n` / `additional_n` for power 0.80. The gate result gains `stats` (`p_value`, `drop`, `baseline_mean`, `required_n`, `additional_n`). Bands from fewer than 3 baseline runs warn. Existing band.json files keep working. If you parse `verdict == "WARN"`, switch to `"INCONCLUSIVE"`.
 
 ## 0.2.0 — 2026-09-29

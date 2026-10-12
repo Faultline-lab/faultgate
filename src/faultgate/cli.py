@@ -13,7 +13,9 @@ from faultgate.checks import CHECKS, Golden, Policy, select
 from faultgate.judge import JUDGE_SPECS, get_judge
 from faultgate.runner import Report
 from faultgate.runner import run as run_checks
-from faultgate.trace import load_otlp
+from faultgate.formats import FORMATS
+from faultgate.formats import load as load_traces
+from faultgate.precheck import DEFAULT_SAMPLE, precheck
 
 
 def _table(report: Report) -> str:
@@ -28,11 +30,11 @@ def _table(report: Report) -> str:
     return "\n".join(rows)
 
 
-def _load(path: str):
+def _load(path: str, fmt: str = "auto"):
     p = Path(path)
     if not p.is_file():
         raise ValueError(f"no such file: {p}")
-    traces = load_otlp(p)
+    traces = load_traces(p, fmt)
     if not traces:
         raise ValueError(f"no traces found in {p}")
     no_content = [t for t in traces if not t.has_content]
@@ -41,9 +43,9 @@ def _load(path: str):
     return traces
 
 
-def _run(path: str, checks, judge) -> tuple[Report, float]:
+def _run(path: str, checks, judge, fmt: str = "auto") -> tuple[Report, float]:
     t0 = time.perf_counter()
-    report = run_checks(_load(path), checks, judge)
+    report = run_checks(_load(path, fmt), checks, judge)
     return report, time.perf_counter() - t0
 
 
@@ -75,7 +77,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         checks = select(args.check, _policy(args), _golden(args))
         judge = _judge_or_none(args, checks)
         band = json.loads(Path(args.band).read_text(encoding="utf-8")) if args.band else None
-        report, elapsed = _run(args.traces, checks, judge)
+        report, elapsed = _run(args.traces, checks, judge, args.format)
     except (ValueError, KeyError, OSError, ImportError) as e:
         print(f"faultgate: {e}", file=sys.stderr)
         return 2
@@ -117,7 +119,7 @@ def cmd_baseline(args: argparse.Namespace) -> int:
         judge = _judge_or_none(args, checks)
         reports = []
         for path in args.traces:
-            report, elapsed = _run(path, checks, judge)
+            report, elapsed = _run(path, checks, judge, args.format)
             rate = sum(report.clean_by_scenario.values()) / len(report.trace_ids)
             print(f"{path}: {len(report.trace_ids)} traces · clean rate {rate:.2f} · {elapsed:.1f}s")
             reports.append(report)
@@ -132,6 +134,17 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     print(f"band [{c['min']:.2f}, {c['max']:.2f}] over {band['n']} scenarios × {band['runs']} runs · "
           f"{len(band['clean_in_all_runs'])} clean in every run · written to {args.out}")
     return 0
+
+
+def cmd_precheck(args: argparse.Namespace) -> int:
+    fmt, total, checked, issues = precheck(args.traces, args.format, args.sample)
+    for i in issues:
+        print(f"{i.level:<8} {i.trace_id:<12}  {i.message}")
+    errors = sum(i.level == "error" for i in issues)
+    warnings = len(issues) - errors
+    verdict = "FAILED" if errors else "OK"
+    print(f"precheck: {verdict} · format {fmt} · checked {checked} of {total} traces · {errors} error(s), {warnings} warning(s)")
+    return 2 if errors else 0
 
 
 def cmd_checks(_: argparse.Namespace) -> int:
@@ -159,6 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--policy", default=None, help='policy.json: {"allow": [...], "max_calls": N, "max_arg_chars": N, "deny_patterns": [...], '
                                                   '"limits": [...], "identity": {...}, "requires": [...]}; a violation fails the gate even with --band')
     c.add_argument("--golden", default=None, help="golden.json: {scenario key or prompt: expected answer}; enables wrong_answer and truncation")
+    c.add_argument("--format", default="auto", choices=FORMATS, help="trace format (default: detect)")
     c.set_defaults(fn=cmd_check)
     b = sub.add_parser("baseline", help="build a tolerance band from >= 2 baseline runs of the same scenarios")
     b.add_argument("traces", nargs="+", help="OTLP JSON files, one per baseline run")
@@ -167,7 +181,13 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--policy", default=None)
     b.add_argument("--golden", default=None)
     b.add_argument("--out", default="band.json")
+    b.add_argument("--format", default="auto", choices=FORMATS, help="trace format (default: detect)")
     b.set_defaults(fn=cmd_baseline)
+    pc = sub.add_parser("precheck", help="validate a trace export (format, roots, span ids, timestamps, content) before checking it")
+    pc.add_argument("traces", help="trace export: OTLP/JSON, OpenInference, Langfuse, LangSmith or Braintrust")
+    pc.add_argument("--format", default="auto", choices=FORMATS)
+    pc.add_argument("--sample", type=int, default=DEFAULT_SAMPLE, help=f"traces to inspect (default {DEFAULT_SAMPLE}; 0 = all)")
+    pc.set_defaults(fn=cmd_precheck)
     sub.add_parser("checks", help="list built-in checks").set_defaults(fn=cmd_checks)
     sub.add_parser("judges", help="list judge specs").set_defaults(fn=cmd_judges)
     return p
