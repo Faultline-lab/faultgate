@@ -74,6 +74,7 @@ class Report:
             "traces": len(self.trace_ids),
             "failed_traces": self.failed_traces,
             "fired": self.fired,
+            "measures": self.measures,
             "results": [
                 {"trace_id": r.trace_id, "scenario": r.scenario, "check": r.check, "detected": r.verdict.detected,
                  "confidence": round(r.verdict.confidence, 4), "reason": r.verdict.reason}

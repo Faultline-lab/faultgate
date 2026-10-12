@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -64,13 +65,13 @@ def markdown(report: Report, gate: dict[str, Any] | None, band: dict[str, Any] |
             lines.append(f"Not enough evidence: a drop of {s['drop']:.2f} needs {s['required_n']} scenarios "
                          f"(α {s['alpha']}, power {s['power']:.2f}); run {s['additional_n']} more.")
         if gate["regressions"]:
-            shown = ", ".join(f"`{r}`" for r in gate["regressions"][:MAX_ROWS])
+            shown = ", ".join(f"`{_cell(r)}`" for r in gate["regressions"][:MAX_ROWS])
             more = f" and {len(gate['regressions']) - MAX_ROWS} more" if len(gate["regressions"]) > MAX_ROWS else ""
             lines.append(f"**Regressions** (clean in every baseline run, not now): {shown}{more}")
         lines.append("")
     lines.append(f"{len(report.failed_traces)}/{n} traces failed · judge {report.judge} · redaction {report.redaction}")
     lines += ["", "| check | fired |", "|---|---|"]
-    lines += [f"| {c} | {k} |" for c, k in report.fired.items()]
+    lines += [f"| {_cell(c)} | {k} |" for c, k in report.fired.items()]
     violations = gate["policy_violations"] if gate else report.fired_on("policy")
     if violations:
         lines += ["", f"### Policy: hard block", "",
@@ -78,14 +79,14 @@ def markdown(report: Report, gate: dict[str, Any] | None, band: dict[str, Any] |
                   "| trace | reason |", "|---|---|"]
         for r in report.results:
             if r.check == "policy" and r.verdict.detected and len(lines) < 200:
-                lines.append(f"| `{r.trace_id[:12]}` | {_cell(r.verdict.reason)} |")
+                lines.append(f"| `{_cell(r.trace_id[:12])}` | {_cell(r.verdict.reason)} |")
     failing = _failing(report)
     if failing:
         lines += ["", f"### Failing traces" + (f" (first {MAX_ROWS} of {len(failing)})" if len(failing) > MAX_ROWS else ""), "",
                   "| scenario | trace | check | reason |", "|---|---|---|---|"]
         for f in failing[:MAX_ROWS]:
             for c in f["checks"]:
-                lines.append(f"| {f['scenario']} | `{f['trace_id'][:12]}` | {c['check']} | {_cell(c['reason'])} |")
+                lines.append(f"| {_cell(f['scenario'])} | `{_cell(f['trace_id'][:12])}` | {_cell(c['check'])} | {_cell(c['reason'])} |")
     usage = (gate or {}).get("usage") or {}
     if usage:
         lines += ["", "### Latency and cost vs baseline", "", "| | baseline | this run | Δ |", "|---|---|---|---|"]
@@ -103,6 +104,17 @@ def _sha256(path: str) -> str:
     return h.hexdigest()
 
 
+def display_path(path: str) -> str:
+    """How a path is written out: relative to the workspace ($GITHUB_WORKSPACE, else the working directory) when
+    inside it, else the file name only. Absolute local paths never reach a PR comment or an audit file."""
+    p = Path(path).resolve()
+    base = Path(os.environ.get("GITHUB_WORKSPACE") or os.getcwd()).resolve()
+    try:
+        return p.relative_to(base).as_posix()
+    except ValueError:
+        return p.name
+
+
 def write_audit(out_dir: str | Path, report: Report, gate: dict[str, Any] | None, inputs: dict[str, str | None],
                 command: str, exit_code: int) -> None:
     d = Path(out_dir)
@@ -113,7 +125,7 @@ def write_audit(out_dir: str | Path, report: Report, gate: dict[str, Any] | None
         "verdict": verdict_of(report, gate),
         "exit_code": exit_code,
         "command": command,
-        "inputs": [{"role": role, "path": p, "sha256": _sha256(p)} for role, p in inputs.items() if p],
+        "inputs": [{"role": role, "path": display_path(p), "sha256": _sha256(p)} for role, p in inputs.items() if p],
         "judge": report.judge,
         "checks": report.checks,
         "redaction": report.redaction,

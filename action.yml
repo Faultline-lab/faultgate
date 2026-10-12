@@ -16,24 +16,39 @@ inputs:
   version: { description: "faultgate version spec, or a path/VCS spec for pip", required: false, default: "faultgate" }
 outputs:
   verdict: { description: "PASS, FAIL or INCONCLUSIVE", value: "${{ steps.gate.outputs.verdict }}" }
+# Inputs reach the shell only as environment variables, never spliced into script text.
 runs:
   using: composite
   steps:
     - uses: actions/setup-python@v5
       with: { python-version: "3.12" }
     - shell: bash
-      run: pip install --quiet "${{ inputs.version }}"
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        pip install --quiet "$VERSION"
     - id: gate
       shell: bash
+      env:
+        TRACES: ${{ inputs.traces }}
+        REPORT: ${{ inputs.report }}
+        AUDIT: ${{ inputs.audit }}
+        FORMAT: ${{ inputs.format }}
+        REDACT: ${{ inputs.redact }}
+        BAND: ${{ inputs.band }}
+        GOLDEN: ${{ inputs.golden }}
+        POLICY: ${{ inputs.policy }}
+        CHECKS: ${{ inputs.checks }}
+        JUDGE: ${{ inputs.judge }}
       run: |
         md="$RUNNER_TEMP/faultgate-summary.md"
-        args=(check "${{ inputs.traces }}" --json "${{ inputs.report }}" --markdown "$md" --audit "${{ inputs.audit }}"
-              --format "${{ inputs.format }}" --redact "${{ inputs.redact }}")
-        [ -n "${{ inputs.band }}" ]   && args+=(--band "${{ inputs.band }}")
-        [ -n "${{ inputs.golden }}" ] && args+=(--golden "${{ inputs.golden }}")
-        [ -n "${{ inputs.policy }}" ] && args+=(--policy "${{ inputs.policy }}")
-        [ -n "${{ inputs.checks }}" ] && args+=(--check "${{ inputs.checks }}")
-        [ -n "${{ inputs.judge }}" ]  && args+=(--judge "${{ inputs.judge }}")
+        args=(check "$TRACES" --json "$REPORT" --markdown "$md" --format "$FORMAT" --redact "$REDACT")
+        [ -n "$AUDIT" ]  && args+=(--audit "$AUDIT")
+        [ -n "$BAND" ]   && args+=(--band "$BAND")
+        [ -n "$GOLDEN" ] && args+=(--golden "$GOLDEN")
+        [ -n "$POLICY" ] && args+=(--policy "$POLICY")
+        [ -n "$CHECKS" ] && args+=(--check "$CHECKS")
+        [ -n "$JUDGE" ]  && args+=(--judge "$JUDGE")
         set +e
         faultgate "${args[@]}"
         code=$?
@@ -52,13 +67,18 @@ runs:
         REPO: ${{ github.repository }}
         MD: ${{ steps.gate.outputs.summary }}
       run: |
-        # one comment per PR, found by its <!-- faultgate --> marker and updated in place
-        id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- faultgate -->")) | .id' | head -1)
+        # one comment per PR, found by its <!-- faultgate --> marker and updated in place.
+        # A comment is a convenience: any API failure (e.g. a fork's read-only token) warns, never fails the job.
+        warn() { echo "::warning::faultgate could not comment on the PR ($1); give the job pull-requests: write"; exit 0; }
+        if ! id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- faultgate -->")) | .id'); then
+          warn "listing comments failed"
+        fi
+        id=$(printf '%s\n' "$id" | head -1)
         if [ -n "$id" ]; then
-          gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$MD" > /dev/null
+          gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$MD" > /dev/null || warn "update failed"
         else
-          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$MD" > /dev/null
-        fi || echo "::warning::faultgate could not comment on the PR (give the job pull-requests: write)"
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$MD" > /dev/null || warn "create failed"
+        fi
     - if: ${{ always() && inputs.audit != '' }}
       uses: actions/upload-artifact@v4
       with:
@@ -67,4 +87,8 @@ runs:
         if-no-files-found: ignore
         overwrite: true
     - shell: bash
-      run: exit ${{ steps.gate.outputs.code || 2 }}  # no recorded code means the gate did not run: fail closed
+      env:
+        CODE: ${{ steps.gate.outputs.code }}
+      run: |
+        # no recorded code means the gate did not run: fail closed
+        exit "${CODE:-2}"

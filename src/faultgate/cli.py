@@ -18,7 +18,7 @@ from faultgate.formats import FORMATS
 from faultgate.formats import load as load_traces
 from faultgate.precheck import DEFAULT_SAMPLE, precheck
 from faultgate.redact import REDACTIONS, get_redactor
-from faultgate.report import markdown, write_audit
+from faultgate.report import display_path, markdown, write_audit
 
 
 def _table(report: Report) -> str:
@@ -139,7 +139,7 @@ def _repro(argv: list[str]) -> str:
             continue
         if a.split("=", 1)[0] in OUTPUT_FLAGS:
             continue
-        keep.append(a)
+        keep.append(display_path(a) if not a.startswith("-") and Path(a).is_file() else a)
     return shlex.join(["faultgate", *keep])
 
 
