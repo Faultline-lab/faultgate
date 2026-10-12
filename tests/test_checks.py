@@ -342,3 +342,29 @@ def test_status_message_and_end_time_are_kept(tmp_path):
     p.write_text(json.dumps(doc))
     (t,) = load_otlp(p)
     assert t.spans[0].status_message == "context_length_exceeded" and t.spans[0].end_ns == 2000000010
+
+
+def test_context_overflow_provider_forms_and_benign_results():
+    from faultgate.checks import context_overflow_rule
+
+    provider_errors = [
+        "The input token count (1048577) exceeds the maximum number of tokens allowed (1048576).",  # Gemini
+        "Input is too long for requested model.",  # Bedrock
+        "This model's maximum context length is 8192 tokens.",  # OpenAI / Azure OpenAI
+        "prompt is too long: 210432 tokens > 200000 maximum",  # Anthropic
+    ]
+    for m in provider_errors:
+        assert context_overflow_rule(_make_trace([("llm_call", "{}", "Error: " + m)])).detected, m
+        assert context_overflow_rule(_make_trace([], {"error.type": m})).detected, m
+    # a normal tool result that quotes the error text is documentation, not an overflow
+    benign = [("search", '{"q": "openai errors"}', "maximum context length errors happen when the prompt is too long")]
+    assert not context_overflow_rule(_make_trace(benign)).detected
+    assert not context_overflow_rule(_make_trace([("read", "{}", '{"text": "context_length_exceeded is returned when"}')])).detected
+
+
+def test_context_overflow_odd_finish_reason_values():
+    from faultgate.checks import context_overflow_rule
+
+    for raw in (123, {"reason": "MAX_TOKENS"}, ["stop", 123], None, []):
+        context_overflow_rule(_make_trace([], {"gen_ai.response.finish_reasons": raw}))  # never raises
+    assert context_overflow_rule(_make_trace([], {"gen_ai.response.finish_reasons": ["stop", 123, "length"]})).detected

@@ -518,7 +518,8 @@ CUTOFF_REASONS = {"length", "max_tokens", "max_output_tokens", "model_length", "
 OVERFLOW = re.compile(
     r"context[ _-]?length[ _-]?exceeded|maximum context length|context[ _-]?window[ _-]?(?:exceeded|overflow)"
     r"|exceeds?\s+the\s+(?:model'?s\s+)?(?:context|token)\s+(?:window|limit)|prompt is too long|too many (?:input )?tokens"
-    r"|token limit (?:reached|exceeded)|max(?:imum)?[ _-]?tokens? (?:limit )?(?:reached|exceeded)",
+    r"|token limit (?:reached|exceeded)|max(?:imum)?[ _-]?tokens? (?:limit )?(?:reached|exceeded)"
+    r"|exceeds?\s+the\s+maximum\s+number\s+of\s+tokens|input is too long for (?:the )?requested model",
     re.I,
 )
 
@@ -528,12 +529,12 @@ def context_overflow_rule(t: Trace) -> Verdict:
 
     Two signals, both structural: a span whose ``gen_ai.response.finish_reasons`` says the output was cut
     (``length``, ``max_tokens``, ...), or a provider error naming the context limit in a span status message,
-    ``error.type``, a tool result, or the root's ``faultgate.termination``. Text that merely talks about tokens
+    ``error.type``, a tool result that is an error, or the root's ``faultgate.termination``. Text that merely talks about tokens
     does not count: the phrases are the error forms providers return.
     """
     for i, s in enumerate(t.spans, start=1):
-        reasons = s.attrs.get("gen_ai.response.finish_reasons")
-        reasons = [reasons] if isinstance(reasons, str) else (reasons or [])
+        raw = s.attrs.get("gen_ai.response.finish_reasons")
+        reasons = raw if isinstance(raw, (list, tuple)) else ([] if raw is None else [raw])
         cut = next((str(r) for r in reasons if str(r).lower() in CUTOFF_REASONS), None)
         if cut:
             return Verdict(True, 1.0, f"span {i} ({s.name}) stopped on finish reason {cut!r}: output cut at the token limit")
@@ -542,6 +543,9 @@ def context_overflow_rule(t: Trace) -> Verdict:
             if m:
                 return Verdict(True, 1.0, f"span {i} ({s.name}) {where}: {m.group(0)!r}")
     for st in t.steps:
+        # only results that are errors: a search hit quoting the error text is not an overflow
+        if not (st.result.lstrip().startswith("Error") or _is_structural_error(st.result)[0]):
+            continue
         m = OVERFLOW.search(st.result)
         if m:
             return Verdict(True, 1.0, f"step {st.index} ({st.tool}) result: {m.group(0)!r}")
