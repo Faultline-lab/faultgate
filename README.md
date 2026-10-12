@@ -30,6 +30,7 @@ Requires Python 3.11 or newer. One dependency (pydantic). The built-in checks ar
 ```bash
 pip install 'faultgate[laya]'   # local judge: downloads Laya once (~800 MB, Apache-2.0, pinned revision), offline after
 pip install 'faultgate[api]'    # any API model through litellm
+pip install 'faultgate[pii]'    # Microsoft Presidio for --redact presidio (names, locations; MIT)
 ```
 
 Read [How much to trust a verdict](#how-much-to-trust-a-verdict) before you enable a judge.
@@ -186,6 +187,18 @@ Reasons name the step and the values: `step 4: modify_billing_record.customer_id
 **A policy violation is a hard block.** With `--band`, a run whose clean rate sits inside the measured band still FAILs if the `policy` check fired on any trace; the gate prints `policy violation in N trace(s) (hard block)` and lists them under `policy_violations` in the JSON report. Noise explains a flaky answer, not a refund over the limit.
 
 Semantic injections — the agent *obeying* text it read in a document — are a judge question, not a rule, and are not in this release.
+
+## Data stays local: redaction
+
+`faultgate` reads your traces in memory and writes no trace payloads anywhere. Rules, policy, bands and the local Laya judge never send anything off the machine. Two things can travel: the trace an **API judge** (`litellm:`) reads, and the **reasons** that end up in your terminal, `--json` report, CI logs and PR comments. By default both are masked:
+
+| `--redact` | Masks | Needs |
+|---|---|---|
+| `builtin` (default) | emails, credit cards (Luhn-checked), US SSNs, phone numbers, IPv4/IPv6, API keys, bearer tokens, JWTs | nothing (stdlib regex) |
+| `presidio` | the above plus Presidio's recognisers: person names, locations, more | `pip install 'faultgate[pii]'` and a spaCy model |
+| `off` | nothing | |
+
+Rules always see the raw values (an `identity` policy has to compare the real customer id); only what leaves is masked: `step 2: update_profile.email '<EMAIL>' != session enduser.id '<EMAIL>'`. The report's `redaction` field records which mode ran. On the 30 real benchmark traces from `make demo-real` the built-in masker finds 81 emails, 39 phone numbers and 69 JWT access tokens, all real-looking customer data or credentials; it changes none of the text in the shipped FAULTLINE traces.
 
 ## Regression or noise? Tolerance bands
 

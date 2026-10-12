@@ -9,6 +9,7 @@
 - Trace formats: `--format auto|otlp|openinference|langfuse|langsmith|braintrust` on `check` and `baseline` (detected by default). Each vendor export is mapped onto the GenAI span model, carrying tool calls, errors, finish reasons, token usage, user id and scenario. Examples in `examples/formats/`.
 - `faultgate precheck`: validates an export (format, roots, duplicate span ids, dangling parents, timestamps, unnamed tool calls, missing content) on the first 5 traces (`--sample`); exit 2 on errors.
 - `Trace.usage`: token totals across spans.
+- Redaction (`--redact builtin|presidio|off`, default `builtin`): PII and secrets are masked in the trace sent to an API judge and in every verdict reason (terminal, JSON report, CI). Rules still read raw values. `builtin` is stdlib regex (emails, Luhn-checked cards, SSNs, phones, IPs, API keys, bearer tokens, JWTs); `presidio` uses the new `[pii]` extra. Reports gain `redaction`.
 - Gate statistics: **WARN is replaced by INCONCLUSIVE.** Between the PASS and FAIL thresholds the gate now runs a one-sided test against the baseline mean (binomial noise of both sides plus measured run-to-run variance); a significant drop (α 0.05) is FAIL, otherwise INCONCLUSIVE with `required_n` / `additional_n` for power 0.80. The gate result gains `stats` (`p_value`, `drop`, `baseline_mean`, `required_n`, `additional_n`). Bands from fewer than 3 baseline runs warn. Existing band.json files keep working. If you parse `verdict == "WARN"`, switch to `"INCONCLUSIVE"`.
 
 ## 0.2.0 — 2026-09-29

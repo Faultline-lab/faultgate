@@ -24,6 +24,7 @@ dependencies = ["pydantic>=2"]
 [project.optional-dependencies]
 laya = ["laya>=0.3.5"]
 api = ["litellm>=1.70"]
+pii = ["presidio-analyzer>=2.2", "presidio-anonymizer>=2.2"]  # aes scout bad272c4: MIT, OK
 dev = ["pytest>=8"]
 demo = ["pyarrow", "huggingface_hub"]
 
