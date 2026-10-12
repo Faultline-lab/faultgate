@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 
 from faultgate.checks import Check
 from faultgate.judge import Judge, Verdict
+from faultgate.redact import safe_key
 from faultgate.trace import Trace
 
 
@@ -91,6 +92,7 @@ def run(traces: list[Trace], checks: list[Check], judge: Judge | None = None,
     report = Report(judge=judge.name if judge else "none", checks=[c.name for c in active],
                     redaction=getattr(redact, "name", "custom") if redact else "off")
     for t in traces:
+        scenario = safe_key(t.key, redact)  # what is written out and matched against bands
         state = None
         for c in active:
             if c.rule:
@@ -103,5 +105,5 @@ def run(traces: list[Trace], checks: list[Check], judge: Judge | None = None,
                 v = judge.ask(state, c.question)
             if redact:
                 v = replace(v, reason=redact(v.reason))
-            report.results.append(Result(t.trace_id, t.key, c.name, v))
+            report.results.append(Result(t.trace_id, scenario, c.name, v))
     return report
