@@ -151,8 +151,8 @@ Three more keys check business rules on what the agent actually did, not just wh
 }
 ```
 
-- `limits`: a numeric floor or ceiling on one argument of one tool. `arg` is a dotted path into the JSON arguments (`refund.amount`). Strings like `"$1,200.50"` are read as numbers. An argument that is present but not a number, or arguments that are not a JSON object, count as a violation; an absent argument does not.
-- `identity`: the argument must equal the authenticated principal, read from the root span attribute `session_attr` (default `enduser.id`). Only calls that carry the argument are checked, optionally only for `tools`. If the root span has no such attribute, the call cannot be verified and counts as a violation.
+- `limits`: a numeric floor or ceiling on one argument of one tool. `arg` is a dotted path into the JSON arguments (`refund.amount`). Strings like `"$1,200.50"` are read as numbers. An argument that is present but not a number, or arguments that are not a JSON object, count as a violation; an absent argument (or no arguments at all) does not. Arguments encoded as JSON twice are decoded. `min`/`max` must be finite numbers.
+- `identity`: the argument must equal the authenticated principal, read from the root span attribute `session_attr` (default `enduser.id`). Only calls that carry the argument are checked, optionally only for `tools`. If the root span has no such attribute, the call cannot be verified and counts as a violation. So do unreadable (non-JSON-object) arguments on a listed tool, or on any tool when no `tools` list is given and the argument's name appears in the text.
 - `requires`: `tool` may only run after an earlier call to `after`, and, if `result_contains` is set, one whose result contains that text.
 
 Reasons name the step and the values: `step 4: modify_billing_record.customer_id 'C-999' != session enduser.id 'C-123'`. [`examples/policy_support.json`](examples/policy_support.json) is a complete customer-support policy. A malformed policy file exits 2.

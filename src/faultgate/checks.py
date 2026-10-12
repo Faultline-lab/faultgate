@@ -135,8 +135,8 @@ def _shape(where: str, d: Any, required: set[str], optional: set[str]) -> dict[s
         raise ValueError(f"policy: {where} has unknown keys {sorted(unknown)}")
     for k in (required | optional) & set(d):
         if k in ("min", "max"):
-            if not _is_num(d[k]):
-                raise ValueError(f"policy: {where}.{k} must be a number")
+            if not _is_num(d[k]) or not math.isfinite(d[k]):
+                raise ValueError(f"policy: {where}.{k} must be a finite number")
         elif k == "tools":
             if not isinstance(d[k], list) or not all(isinstance(x, str) for x in d[k]):
                 raise ValueError(f"policy: {where}.tools must be a list of tool names")
@@ -234,8 +234,13 @@ def _number(v: Any) -> float | None:
 
 
 def _args_object(arguments: str) -> dict[str, Any] | None:
+    """The arguments as a JSON object: ``{}`` when there are none, one extra decode for JSON encoded twice, else None."""
+    if not arguments.strip():
+        return {}
     try:
         d = json.loads(arguments)
+        if isinstance(d, str):
+            d = json.loads(d)
     except ValueError:
         return None
     return d if isinstance(d, dict) else None
@@ -261,8 +266,14 @@ def _business_violations(t: Trace, st: Step, earlier: list[Step], policy: Policy
         elif lim.min is not None and n < lim.min:
             bad.append(f"step {st.index}: {st.tool}.{lim.arg} {n:g} < min {lim.min:g}")
     ident = policy.identity
-    if ident and (ident.tools is None or st.tool in ident.tools) and args is not None:
-        raw = _dig(args, ident.arg)
+    if ident and (ident.tools is None or st.tool in ident.tools):
+        # unreadable arguments: fail closed for a listed tool, or when the argument's name is visible in the text
+        if args is None:
+            if ident.tools is not None or ident.arg.split(".")[-1] in st.arguments:
+                bad.append(f"step {st.index}: {st.tool} arguments are not a JSON object, cannot check {ident.arg}")
+            raw = _ABSENT
+        else:
+            raw = _dig(args, ident.arg)
         if raw is not _ABSENT:
             root = t.root
             session = root.attrs.get(ident.session_attr) if root else None
