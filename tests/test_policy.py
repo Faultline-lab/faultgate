@@ -232,3 +232,16 @@ def test_support_example_policy_no_false_positives_from_new_keys():
     traces = [t for f in files for t in load_otlp(f)]
     assert len(traces) > 100
     assert not [policy_rule(t, business_only).reason for t in traces if policy_rule(t, business_only).detected]
+
+
+def test_faultline_policy_json_is_picked_up_by_convention(tmp_path, monkeypatch, capsys):
+    from faultgate import cli
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "faultline-policy.json").write_text(json.dumps({"max_calls": 0}))
+    assert cli.main(["check", str(EXAMPLES), "--check", "policy"]) == 1
+    assert "using ./faultline-policy.json" in capsys.readouterr().err
+    assert cli.main(["check", str(EXAMPLES), "--check", "policy", "--policy", str(GATE / "policy.json")]) == 1  # explicit wins
+    assert "faultline-policy.json" not in capsys.readouterr().err
+    (tmp_path / "faultline-policy.json").unlink()
+    assert cli.main(["check", str(EXAMPLES), "--check", "policy"]) == 0
