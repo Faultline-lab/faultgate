@@ -46,7 +46,7 @@ faultgate check traces.json --judge litellm:openai/gpt-5.6-luna   # any API mode
 faultgate checks                                     # list checks and their kind
 faultgate judges                                     # list judge specs
 
-faultgate baseline run1.json run2.json --out band.json   # measure your noise (>= 2 runs)
+faultgate baseline run1.json run2.json run3.json --out band.json   # measure your noise (3+ runs)
 faultgate check candidate.json --band band.json          # regression, or just noise?
 ```
 
@@ -188,8 +188,17 @@ Real runs: two `z-ai/glm-5.3-flash` baselines and `openai/gpt-5.6-luna` / `qwen/
 | Verdict | Rule (n = scenarios in the band) | Exit |
 |---|---|---|
 | **PASS** | clean rate ≥ min observed − 1/n | 0 |
-| **WARN** | in between — a human should look | 0 |
-| **FAIL** | clean rate < min observed − 3/n | 1 |
+| **FAIL** | clean rate < min observed − 3/n, or below PASS and the drop is significant (one-sided, α = 0.05) | 1 |
+| **INCONCLUSIVE** | in between and not significant: the gate says how many scenarios it would need (power 0.80) | 0 |
+
+In between the two thresholds, the gate tests whether the candidate's clean rate is below the baseline mean. The variance is the binomial noise of both sides plus the run-to-run variance the baseline measured, so a noisy baseline needs a bigger drop to fail. When it cannot tell, it says so and sizes the fix:
+
+```
+gate: INCONCLUSIVE · clean rate 0.93 vs band [1.00, 1.00] from 2 baseline runs · fail below 0.90 · p=0.072
+inconclusive: a drop of 0.07 needs 89 scenarios to tell from noise (alpha 0.05, power 0.80) · run 59 more
+```
+
+(Two failures injected into a run of a baseline that was clean on all 30 scenarios; `tests/test_band.py`.) `required_n` is the standard two-proportion sample size for the observed drop. The gate result in the JSON report carries the same numbers under `stats`. Build the band from 3 or more baseline runs; with 2, the run-to-run variance is a guess and the gate warns.
 
 It also lists **regressions**: scenarios clean in *every* baseline run and not clean now — the ones to read first. Scenarios are matched across runs by `faultgate.scenario`, else `gen_ai.agent.id`, else a hash of the prompt.
 
@@ -223,7 +232,7 @@ gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail 
     policy: traces/policy.json         # optional
 ```
 
-Exit 1 on gate FAIL, so the job fails; WARN and PASS pass. The report lands in `faultgate-report.json` for upload as an artifact. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes.
+Exit 1 on gate FAIL, so the job fails; PASS and INCONCLUSIVE pass (INCONCLUSIVE prints how many more scenarios to run). The report lands in `faultgate-report.json` for upload as an artifact. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes.
 
 ## How much to trust a verdict
 

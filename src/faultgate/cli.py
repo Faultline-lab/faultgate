@@ -94,8 +94,12 @@ def cmd_check(args: argparse.Namespace) -> int:
         for w in g["warnings"]:
             print(f"warning: {w}", file=sys.stderr)
         lo, hi = g["band"]
+        s = g["stats"]
         print(f"gate: {g['verdict']} · clean rate {g['clean_rate']:.2f} vs band [{lo:.2f}, {hi:.2f}] from {band['runs']} baseline runs"
-              f" · fail below {g['fail_threshold']:.2f}")
+              f" · fail below {g['fail_threshold']:.2f} · p={s['p_value']:.3f}")
+        if g["verdict"] == "INCONCLUSIVE":
+            print(f"inconclusive: a drop of {s['drop']:.2f} needs {s['required_n']} scenarios to tell from noise "
+                  f"(alpha {s['alpha']}, power {s['power']:.2f}) · run {s['additional_n']} more")
         if g["policy_violations"]:
             print(f"gate: FAIL · policy violation in {len(g['policy_violations'])} trace(s) (hard block)")
         if g["regressions"]:
@@ -118,6 +122,8 @@ def cmd_baseline(args: argparse.Namespace) -> int:
             print(f"{path}: {len(report.trace_ids)} traces · clean rate {rate:.2f} · {elapsed:.1f}s")
             reports.append(report)
         band = bandmod.build(reports)
+        if len(reports) < bandmod.RECOMMENDED_RUNS:
+            print(f"note: {len(reports)} baseline runs measure noise poorly; use {bandmod.RECOMMENDED_RUNS} or more", file=sys.stderr)
     except (ValueError, KeyError, OSError) as e:
         print(f"faultgate: {e}", file=sys.stderr)
         return 2
