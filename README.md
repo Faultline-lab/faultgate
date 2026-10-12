@@ -71,40 +71,40 @@ Run `make demo-real` (first run downloads ~220 MB, ~1 min) to fetch and evaluate
 
 ```
 $ faultgate check .demo/real_traces.json
-trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error
-------------------------------------------------------------------------------------------------------------
-8a224e8eacdd  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-3cf53cafee61  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-0ff67ea879fc  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-0f2709401932  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-a182fd9c1858  ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
-9bf471687b5f  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-16b13ee29724  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-9dc71e9167b0  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-3524b4b6ef7e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-9ca4051344ef  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-56e646e603b2  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-f406d07bd94c  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-012e74b002d9  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-f0cd792c3105  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-7c69e4d47302  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-fadbf538c24a  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-8e611f21829d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-70722761fb7a  FAIL 1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
-4ab9ef2c7e60  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-910a177350e2  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-a585b61b1598  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-3d7d24721847  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00
-4422dd26b177  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-bff8bb4c1b2e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-e42782af7315  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-53fdb0601422  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-1dff5fc97b54  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-88733a4ec841  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-dc97bf8af1d8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
-192bf8092eb8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
+------------------------------------------------------------------------------------------------------------------------------
+8a224e8eacdd  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3cf53cafee61  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+0ff67ea879fc  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+0f2709401932  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+a182fd9c1858  ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00         ok   1.00
+9bf471687b5f  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+16b13ee29724  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+9dc71e9167b0  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+3524b4b6ef7e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+9ca4051344ef  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+56e646e603b2  FAIL 1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+f406d07bd94c  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+012e74b002d9  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+f0cd792c3105  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+7c69e4d47302  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+fadbf538c24a  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+8e611f21829d  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+70722761fb7a  FAIL 1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00         ok   1.00
+4ab9ef2c7e60  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+910a177350e2  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+a585b61b1598  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+3d7d24721847  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00
+4422dd26b177  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+bff8bb4c1b2e  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+e42782af7315  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+53fdb0601422  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+1dff5fc97b54  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+88733a4ec841  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+dc97bf8af1d8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+192bf8092eb8  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
 
-9/30 traces failed · search_loop=2, abstention=0, policy=0, repeated_call=2, unrecovered_tool_error=6 · judge none · 1.1s
+9/30 traces failed · search_loop=2, abstention=0, policy=0, repeated_call=2, unrecovered_tool_error=6, context_overflow=0 · judge none · 2.1s
 ```
 
 Two new checks with measured trust, ported from [FAULTLINE P18](https://github.com/samirsawarkar/faultline-ai-reliability) (`projects/p18_trace_triage`):
@@ -174,7 +174,7 @@ examples/gate/baseline_glm_run2.json: 30 traces · clean rate 0.93 · 0.0s
 band [0.93, 0.93] over 30 scenarios × 2 runs · 26 clean in every run · written to band.json
 
 $ faultgate check examples/gate/candidate_gpt.json --band band.json
-18/30 traces failed · search_loop=18, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0 · judge none · 0.0s
+18/30 traces failed · search_loop=18, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
 gate: FAIL · clean rate 0.40 vs band [0.93, 0.93] from 2 baseline runs · fail below 0.83 · p=0.000
 regressions (clean in every baseline, not now): r-0208, r-0214, r-0216, r-0224, r-0226, r-0232, r-0258, ...
 
@@ -213,11 +213,11 @@ examples/gate/baseline_glm_run2.json: 30 traces · clean rate 0.87 · 0.0s      
 band [0.80, 0.87] over 30 scenarios × 2 runs · 21 clean in every run
 
 $ faultgate check examples/gate/candidate_gpt.json --golden examples/gate/golden.json --band band.json
-21/30 traces failed · search_loop=18, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, wrong_answer=3, truncation=3 · judge none · 0.0s
+21/30 traces failed · search_loop=18, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0, wrong_answer=3, truncation=3 · judge none · 0.0s
 gate: FAIL · clean rate 0.30 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70 · p=0.000
 
 $ faultgate check examples/gate/candidate_qwen.json --golden examples/gate/golden.json --band band.json
-18/30 traces failed · search_loop=9, abstention=0, policy=0, repeated_call=1, unrecovered_tool_error=0, wrong_answer=9, truncation=8 · judge none · 0.0s
+18/30 traces failed · search_loop=9, abstention=0, policy=0, repeated_call=1, unrecovered_tool_error=0, context_overflow=0, wrong_answer=9, truncation=8 · judge none · 0.0s
 gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail below 0.70 · p=0.000
 ```
 
