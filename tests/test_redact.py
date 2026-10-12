@@ -124,3 +124,56 @@ def test_get_redactor_specs():
     except ImportError:
         with pytest.raises(ValueError, match=r"faultgate\[pii\]"):
             get_redactor("presidio")
+
+
+# --- review round 1 (Codex) ---
+
+# Built at runtime from prefix + filler: real-looking token literals in source trip secret scanners.
+def _tok(prefix: str, n: int, alphabet: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") -> str:
+    return prefix + (alphabet * (n // len(alphabet) + 1))[:n]
+
+
+@pytest.mark.parametrize("token", [
+    _tok("xapp-1-A0123456789-", 40),                     # Slack app token
+    _tok("ya29" + ".", 36),                              # Google OAuth access token
+    _tok("SG" + ".", 22) + "." + _tok("", 43),           # SendGrid
+    _tok("sk" + "_live_", 24),                           # Stripe
+    _tok("hf" + "_", 34),                                # Hugging Face
+    _tok("sk-ant-api03-", 40),                           # Anthropic
+    _tok("xoxb-123456789012-", 30),                      # Slack bot token
+], ids=["slack-app", "google-oauth", "sendgrid", "stripe", "huggingface", "anthropic", "slack-bot"])
+def test_more_token_families(token):
+    assert R(f"key={token} end") == "key=<SECRET> end"
+
+
+@pytest.mark.parametrize("hostile", ["1-" * 50000 + "x", "a." * 50000, "1 " * 50000, "a@" * 30000, "9" * 100000,
+                                     "aa:" * 40000, "(" + "1 " * 40000, "Bearer " + "a" * 100000],
+                         ids=["dash-digits", "dots", "spaced-digits", "at-signs", "digits", "colons", "paren", "bearer"])
+def test_no_catastrophic_backtracking(hostile):
+    import time
+
+    t0 = time.perf_counter()
+    R(hostile)
+    assert time.perf_counter() - t0 < 1.0
+
+
+def test_scenario_keys_are_masked_but_stay_unique_and_stable():
+    """Explicit scenario keys can carry PII; with redaction they are masked plus a short hash, so matching still works."""
+    from faultgate import band as bandmod
+    from faultgate.trace import Span, Trace
+
+    def trace(tid, scenario):
+        root = Span(span_id="r", parent_id=None, name="invoke_agent", start_ns=1,
+                    attrs={"gen_ai.operation.name": "invoke_agent", "faultgate.scenario": scenario})
+        return Trace(trace_id=tid, agent="a", spans=[root])
+
+    keys = ["refund for jane@corp.example.com", "refund for bob@corp.example.com", "r-0336"]
+    runs = [run([trace(f"{i}{k}", k) for k in keys], select("abstention"), None, redact=R) for i in range(3)]
+    shown = [r.scenario for r in runs[0].results]
+    assert all("@corp" not in s for s in shown) and len(set(shown)) == 3 and "r-0336" in shown
+    assert shown == [r.scenario for r in runs[1].results]  # stable across runs
+    b = bandmod.build(runs)
+    assert b["n"] == 3 and not any("@corp" in s for s in b["scenarios"])
+    assert bandmod.evaluate(runs[2], b)["missing"] == []
+    raw = run([trace("x", keys[0])], select("abstention"), None)
+    assert raw.results[0].scenario == keys[0]  # redaction off: untouched

@@ -13,6 +13,7 @@ recognisers, including person names and locations, on top of ``builtin``.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -39,13 +40,26 @@ def _phone(m: re.Match[str]) -> bool:
     return 9 <= len(re.sub(r"\D", "", m.group(0))) <= 15
 
 
-# order matters: secrets and cards before the looser phone / IP patterns
+# Order matters: secrets and cards before the looser phone / IP patterns.
+# Every pattern is anchored by a lookbehind (so a match can only start at a token boundary) and every
+# repetition is bounded: worst case is linear in the input, whatever an agent wrote into its trace.
+TOKEN = r"[A-Za-z0-9_-]"
 PATTERNS: list[tuple[str, re.Pattern[str], Callable[[re.Match[str]], bool] | None]] = [
-    ("SECRET", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), None),
-    ("SECRET", re.compile(r"(?i)(?<=bearer )[A-Za-z0-9._~+/-]{16,}=*"), None),
-    ("SECRET", re.compile(r"\b(?:sk|pk|rk)-(?:[a-z]+-)?[A-Za-z0-9_-]{16,}|\bAKIA[0-9A-Z]{16}\b|\bgh[pousr]_[A-Za-z0-9]{30,}"
-                          r"|\bxox[abpr]-[A-Za-z0-9-]{10,}|\bAIza[0-9A-Za-z_-]{35}"), None),
-    ("EMAIL", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"), None),
+    ("SECRET", re.compile(r"(?<![\w.-])eyJ[A-Za-z0-9_-]{8,4096}\.[A-Za-z0-9_-]{8,4096}\.[A-Za-z0-9_-]{8,4096}"), None),
+    ("SECRET", re.compile(r"(?i)(?<=bearer )[A-Za-z0-9._~+/-]{16,4096}=*"), None),
+    ("SECRET", re.compile(
+        r"(?<![\w-])(?:"
+        r"(?:sk|pk|rk)-(?:[a-z]{1,12}-){0,2}" + TOKEN + r"{16,256}"          # OpenAI, Anthropic, generic
+        r"|[sr]k_(?:live|test)_[0-9A-Za-z]{16,256}"                          # Stripe
+        r"|AKIA[0-9A-Z]{16}"                                                 # AWS access key id
+        r"|gh[pousr]_[A-Za-z0-9]{30,255}"                                    # GitHub
+        r"|xox[abposre]-[A-Za-z0-9-]{10,255}|xapp-[A-Za-z0-9-]{10,255}"     # Slack bot / user / app
+        r"|AIza[0-9A-Za-z_-]{35}|ya29\.[0-9A-Za-z_-]{20,2048}"               # Google API key / OAuth token
+        r"|SG\.[\w-]{16,64}\.[\w-]{16,128}"                                  # SendGrid
+        r"|hf_[A-Za-z0-9]{30,64}"                                            # Hugging Face
+        r")(?![\w-])"), None),
+    ("EMAIL", re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}"
+                         r"\.[A-Za-z]{2,24}(?![A-Za-z0-9-])"), None),
     ("CREDIT_CARD", re.compile(r"(?<![\w.])\d(?:[ -]?\d){12,18}(?![\w.])"), _card),
     ("US_SSN", re.compile(r"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b"), None),
     ("IP_ADDRESS", re.compile(r"(?<![\w.])(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?![\w.])"), None),
@@ -89,6 +103,15 @@ def presidio() -> Redactor:
         return _builtin(masked)
 
     return Redactor("presidio", fn)
+
+
+def safe_key(key: str, redact: Callable[[str], str] | None) -> str:
+    """A scenario key fit to write out: unchanged when there is nothing to mask, else masked plus a short hash
+    of the raw key, so two masked keys stay distinct and the same raw key maps to the same output every run."""
+    if redact is None:
+        return key
+    masked = redact(key)
+    return key if masked == key else f"{masked}#{hashlib.sha256(key.encode('utf-8')).hexdigest()[:8]}"
 
 
 def get_redactor(spec: str) -> Redactor | None:
