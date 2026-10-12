@@ -25,7 +25,7 @@ def test_rule_needs_no_judge(fake_judge):
 
 
 def test_kinds():
-    assert [c.kind for c in CHECKS.values()] == ["rule", "rule", "rule", "rule", "rule", "golden", "golden", "judge"]
+    assert [c.kind for c in CHECKS.values()] == ["rule", "rule", "rule", "rule", "rule", "rule", "golden", "golden", "judge"]
 
 
 def test_abstention_rule_on_examples():
@@ -284,3 +284,61 @@ def test_unrecovered_span_error_middle_recovered():
     )
     v = unrecovered_tool_error_rule(t)
     assert not v.detected
+
+
+def test_context_overflow_finish_reason():
+    from faultgate.checks import context_overflow_rule
+
+    assert not context_overflow_rule(_make_trace([("search", "{}", "ok")])).detected
+    for reasons in (["length"], ["stop", "max_tokens"], "length", ["MAX_TOKENS"]):
+        v = context_overflow_rule(_make_trace([("search", "{}", "ok")], {"gen_ai.response.finish_reasons": reasons}))
+        assert v.detected, reasons
+    v = context_overflow_rule(_make_trace([], {"gen_ai.response.finish_reasons": ["length"]}))
+    assert v.reason == "span 2 (chat) stopped on finish reason 'length': output cut at the token limit"
+    assert not context_overflow_rule(_make_trace([], {"gen_ai.response.finish_reasons": ["stop", "tool_calls"]})).detected
+
+
+def test_context_overflow_error_text():
+    from faultgate.checks import context_overflow_rule
+
+    msgs = [
+        "This model's maximum context length is 128000 tokens. However, your messages resulted in 130211 tokens.",
+        "Error code: 400 - context_length_exceeded",
+        "prompt is too long: 210432 tokens > 200000 maximum",
+        "input exceeds the context window",
+    ]
+    for m in msgs:
+        assert context_overflow_rule(_make_trace([("search", "{}", "Error: " + m)])).detected, m
+        assert context_overflow_rule(_make_trace([], {"error.type": m})).detected, m
+    t = _make_trace([("search", "{}", "ok")])
+    t.spans[0].status_message = "context_length_exceeded"
+    assert context_overflow_rule(t).detected
+    t = _make_trace([])
+    t.spans[0].attrs["faultgate.termination"] = "context window exceeded"
+    assert context_overflow_rule(t).detected
+    # talking about tokens is not an overflow
+    benign = [("search", '{"q": "max tokens setting"}', "the context window of GPT-4 is 128k tokens")]
+    assert not context_overflow_rule(_make_trace(benign)).detected
+
+
+def test_context_overflow_zero_on_shipped_traces():
+    from pathlib import Path
+
+    from faultgate.checks import context_overflow_rule
+
+    files = [EXAMPLES, *sorted((EXAMPLES.parent / "gate").glob("*_*.json"))]
+    traces = [t for f in files if f.name not in ("golden.json", "policy.json") for t in load_otlp(f)]
+    assert len(traces) > 100 and not any(context_overflow_rule(t).detected for t in traces)
+
+
+def test_status_message_and_end_time_are_kept(tmp_path):
+    import json
+
+    doc = {"resourceSpans": [{"scopeSpans": [{"spans": [{
+        "traceId": "a" * 32, "spanId": "1" * 16, "name": "invoke_agent",
+        "startTimeUnixNano": "10", "endTimeUnixNano": "2000000010",
+        "status": {"code": 2, "message": "context_length_exceeded"}, "attributes": []}]}]}]}
+    p = tmp_path / "t.json"
+    p.write_text(json.dumps(doc))
+    (t,) = load_otlp(p)
+    assert t.spans[0].status_message == "context_length_exceeded" and t.spans[0].end_ns == 2000000010
