@@ -232,3 +232,96 @@ def test_support_example_policy_no_false_positives_from_new_keys():
     traces = [t for f in files for t in load_otlp(f)]
     assert len(traces) > 100
     assert not [policy_rule(t, business_only).reason for t in traces if policy_rule(t, business_only).detected]
+
+
+# --- order-level rules (client test, tau2 retail): bound prerequisites, either-or, per-value budgets, allowed values ---
+
+RETAIL = EXAMPLES.parent / "policy_retail.json"
+PENDING = '{"order_id": "#W1", "status": "pending"}'
+
+
+def test_requires_same_arg_binds_the_prerequisite_to_the_same_order():
+    pol = _policy(requires=[{"tool": "cancel_pending_order", "after": "get_order_details", "result_contains": "pending",
+                             "same_arg": "order_id"}])
+    ok = [("get_order_details", {"order_id": "#W1"}, PENDING), ("cancel_pending_order", {"order_id": "#W1"})]
+    assert not policy_rule(_run(ok), pol).detected
+    # the client's reproducer: read the status of one order, cancel another
+    v = policy_rule(_run([("get_order_details", {"order_id": "other"}, '{"status":"pending"}'),
+                          ("cancel_pending_order", {"order_id": "victim"})]), pol)
+    assert v.detected and v.reason == ("step 2: cancel_pending_order before get_order_details returned 'pending' "
+                                       "for the same order_id 'victim'")
+    # the same order, but its status was not pending
+    assert policy_rule(_run([("get_order_details", {"order_id": "#W1"}, '{"status": "delivered"}'),
+                             ("cancel_pending_order", {"order_id": "#W1"})]), pol).detected
+    # fails closed when the call does not carry the argument it is bound by
+    v = policy_rule(_run([ok[0], ("cancel_pending_order", {"reason": "x"})]), pol)
+    assert v.detected and "has no readable order_id" in v.reason
+
+
+def test_requires_after_accepts_alternatives():
+    pol = _policy(requires=[{"tool": "get_user_details", "after": ["find_user_id_by_email", "find_user_id_by_name_zip"]}])
+    for first in ("find_user_id_by_email", "find_user_id_by_name_zip"):
+        assert not policy_rule(_run([(first, {}), ("get_user_details", {})]), pol).detected
+    v = policy_rule(_run([("get_user_details", {})]), pol)
+    assert v.detected and v.reason == "step 1: get_user_details before find_user_id_by_email or find_user_id_by_name_zip"
+
+
+def test_max_calls_per_arg_counts_successful_calls_per_value():
+    pol = _policy(max_calls_per_arg=[{"tools": ["exchange", "modify_items"], "arg": "order_id", "max": 1}])
+    assert not policy_rule(_run([("exchange", {"order_id": "#W1"}), ("modify_items", {"order_id": "#W2"})]), pol).detected
+    v = policy_rule(_run([("exchange", {"order_id": "#W1"}), ("lookup", {}), ("modify_items", {"order_id": "#W1"})]), pol)
+    assert v.detected and v.reason == "step 3: 2 successful exchange/modify_items calls for order_id '#W1' > max 1 (steps 1, 3)"
+    # a call that returned an error changed nothing: fix the item id, retry, one modification
+    assert not policy_rule(_run([("exchange", {"order_id": "#W1"}, "Error: 1656 not found"),
+                                 ("exchange", {"order_id": "#W1"}, "{}")]), pol).detected
+    v = policy_rule(_run([("exchange", "order #W1")]), pol)
+    assert v.detected and "cannot count it" in v.reason
+
+
+def test_values_allowlists_an_argument():
+    pol = _policy(values=[{"tool": "cancel_pending_order", "arg": "reason", "allowed": ["no longer needed", "ordered by mistake"]}])
+    assert not policy_rule(_run([("cancel_pending_order", {"reason": "ordered by mistake"})]), pol).detected
+    assert not policy_rule(_run([("cancel_pending_order", {"order_id": "#W1"})]), pol).detected  # absent: not checked
+    v = policy_rule(_run([("cancel_pending_order", {"reason": "invalid reason"})]), pol)
+    assert v.detected and v.reason == "step 1: cancel_pending_order.reason 'invalid reason' not in allowed values"
+    assert policy_rule(_run([("cancel_pending_order", "reason=whatever")]), pol).detected  # unreadable: fails closed
+
+
+@pytest.mark.parametrize("bad", [
+    {"requires": [{"tool": "x", "after": []}]},
+    {"requires": [{"tool": "x", "after": ["a", 3]}]},
+    {"requires": [{"tool": "x", "after": "a", "same_arg": 1}]},
+    {"max_calls_per_arg": [{"tools": ["x"], "arg": "a"}]},
+    {"max_calls_per_arg": [{"tools": ["x"], "arg": "a", "max": 0}]},
+    {"max_calls_per_arg": [{"tools": ["x"], "arg": "a", "max": 1.5}]},
+    {"max_calls_per_arg": [{"tools": "x", "arg": "a", "max": 1}]},
+    {"values": [{"tool": "x", "arg": "a"}]},
+    {"values": [{"tool": "x", "arg": "a", "allowed": []}]},
+    {"values": [{"tool": "x", "arg": "a", "allowed": "yes"}]},
+])
+def test_malformed_order_level_keys_raise(tmp_path, bad):
+    p = tmp_path / "policy.json"
+    p.write_text(json.dumps(bad))
+    with pytest.raises(ValueError, match="policy: "):
+        Policy.load(p)
+
+
+def test_retail_example_policy():
+    pol = Policy.load(RETAIL)
+    assert pol.requires and pol.max_calls_per_arg and pol.values and pol.allow
+    compliant = [
+        ("find_user_id_by_name_zip", {"first_name": "Yusuf", "last_name": "Rossi", "zip": "19122"}, "yusuf_rossi_9620"),
+        ("get_user_details", {"user_id": "yusuf_rossi_9620"}, "{}"),
+        ("get_order_details", {"order_id": "#W1"}, PENDING),
+        ("modify_pending_order_items", {"order_id": "#W1", "item_ids": ["1"], "new_item_ids": ["2"]}, "{}"),
+        ("get_order_details", {"order_id": "#W2"}, '{"order_id": "#W2", "status": "pending"}'),
+        ("cancel_pending_order", {"order_id": "#W2", "reason": "no longer needed"}, "{}"),
+    ]
+    assert not policy_rule(_run(compliant), pol).detected
+    twice = compliant + [("modify_pending_order_items", {"order_id": "#W1", "item_ids": ["3"], "new_item_ids": ["4"]}, "{}")]
+    assert "2 successful" in policy_rule(_run(twice), pol).reason
+    # no false positives from the new keys on the shipped real runs (their tools are not retail tools)
+    business_only = dataclasses.replace(pol, allow=None)
+    files = [EXAMPLES, *sorted(GATE.glob("baseline_*.json")), *sorted(GATE.glob("candidate_*.json"))]
+    traces = [t for f in files for t in load_otlp(f)]
+    assert not [policy_rule(t, business_only).reason for t in traces if policy_rule(t, business_only).detected]

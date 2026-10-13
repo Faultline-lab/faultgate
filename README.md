@@ -53,7 +53,7 @@ faultgate baseline run1.json run2.json run3.json --out band.json   # measure you
 faultgate check candidate.json --band band.json          # regression, or just noise?
 ```
 
-Exit codes: `0` clean · `1` at least one check fired (or, with `--band`, gate FAIL) · `2` bad input.
+Exit codes: `0` clean · `1` at least one check fired (or, with `--band`, gate FAIL) · `2` bad input, or an output file (`--json`, `--markdown`, `--audit`, `--out`) that cannot be written. Missing parent directories of output files are created.
 
 ### Input format
 
@@ -61,8 +61,10 @@ An [OTLP/JSON](https://opentelemetry.io/docs/specs/otlp/#json-protobuf-encoding)
 
 | Span | Attributes read |
 |---|---|
-| root `invoke_agent` | `gen_ai.agent.name`, `gen_ai.input.messages` (the user prompt), `gen_ai.output.messages` (the final answer), optional `faultgate.termination` (why the run stopped, e.g. `step cap`) |
-| child `execute_tool` | `gen_ai.tool.name`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
+| root `invoke_agent` | `gen_ai.operation.name` = `invoke_agent`, `gen_ai.agent.name`, `gen_ai.input.messages` (the user prompt), `gen_ai.output.messages` (the final answer), optional `faultgate.termination` (why the run stopped, e.g. `step cap`) |
+| child `execute_tool` | `gen_ai.operation.name` = `execute_tool`, `gen_ai.tool.name`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` |
+
+Set `gen_ai.operation.name`. A span without it is still read as a tool call when its name is `execute_tool` or `execute_tool <tool>` (the semconv span name), and `precheck` warns that it was recognised by name only.
 
 Legacy `gen_ai.prompt` / `gen_ai.completion` are accepted as fallback. If your exporter records structure but not content, `faultgate` warns you. [`examples/traces.json`](https://github.com/Faultline-lab/faultgate/blob/main/examples/traces.json) is a complete reference file.
 
@@ -86,10 +88,10 @@ Validate an export before you gate on it:
 
 ```
 $ faultgate precheck examples/formats/langfuse.json
-precheck: OK · format langfuse · checked 1 of 1 traces · 0 error(s), 0 warning(s)
+precheck: OK · format langfuse · checked 1 of 1 traces · 2 tool steps read · 0 error(s), 0 warning(s)
 ```
 
-It reports the detected format, then per trace: duplicate span ids, missing or backwards timestamps, tool calls without a name (errors, exit 2), and missing roots, spans whose parent is not in the export, runs with no prompt, answer or content (warnings, exit 0). It inspects the first 5 traces by default (`--sample N`, `0` for all). On the 30 real benchmark traces from `make demo-real` it passes with warnings: those exports omit the root span.
+It reports the detected format and how many tool steps the checks will read, then per trace: duplicate span ids, missing or backwards timestamps, tool calls without a name (errors, exit 2), and missing roots, spans whose parent is not in the export, runs with no prompt, answer or content, tool spans recognised only by their span name, spans that carry tool attributes but are not read as steps, and exports that mix native `execute_tool` spans with OpenInference LLM spans (warnings, exit 0). Compare the tool-step count with what your agent actually ran: a structurally valid export whose tools are not read passes every check by default. It inspects the first 5 traces by default (`--sample N`, `0` for all). On the 30 real benchmark traces from `make demo-real` it passes with warnings: those exports omit the root span.
 
 ## Measured on real agent traces
 
@@ -151,7 +153,7 @@ These are public benchmark traces, not production traffic; the P18 sample was st
 | Check | Kind | Fires when |
 |---|---|---|
 | `search_loop` | rule | The run ended with no answer at its step budget and most tool calls returned nothing. |
-| `abstention` | rule | The final answer explicitly says the information could not be found. |
+| `abstention` | rule | The final answer explicitly says the information could not be found: an inability to *find* (`couldn't find / locate / retrieve / determine`), `no matching documents`, `information not available`, `don't know`. A bare `cannot` / `unable to` does not count: a support agent that "cannot modify the order again" or is "unable to verify" an unauthenticated caller has not abstained. |
 | `policy` | rule | A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, call budget, argument limit, identity mismatch, or missing prerequisite. |
 | `repeated_call` | rule | The same tool was called with identical arguments and returned identical results >= 3 times. |
 | `unrecovered_tool_error` | rule | A tool call produced a structural error with no later successful call of the same tool, or a span errored (error.type or status code 2) and no later span made a successful tool call. |
@@ -183,6 +185,24 @@ Three more keys check business rules on what the agent actually did, not just wh
 - `limits`: a numeric floor or ceiling on one argument of one tool. `arg` is a dotted path into the JSON arguments (`refund.amount`). Strings like `"$1,200.50"` are read as numbers. An argument that is present but not a number, or arguments that are not a JSON object, count as a violation; an absent argument (or no arguments at all) does not. Arguments encoded as JSON twice are decoded. `min`/`max` must be finite numbers.
 - `identity`: the argument must equal the authenticated principal, read from the root span attribute `session_attr` (default `enduser.id`). Only calls that carry the argument are checked, optionally only for `tools`. If the root span has no such attribute, the call cannot be verified and counts as a violation. So do unreadable (non-JSON-object) arguments on a listed tool, or on any tool when no `tools` list is given and the argument's name appears in the text.
 - `requires`: `tool` may only run after an earlier call to `after`, and, if `result_contains` is set, one whose result contains that text.
+
+Order-level rules bind a call to the record it acts on:
+
+```json
+{
+ "requires": [{"tool": "get_user_details", "after": ["find_user_id_by_email", "find_user_id_by_name_zip"]},
+              {"tool": "cancel_pending_order", "after": "get_order_details", "result_contains": "pending", "same_arg": "order_id"}],
+ "max_calls_per_arg": [{"tools": ["exchange_delivered_order_items", "modify_pending_order_items"], "arg": "order_id", "max": 1}],
+ "values": [{"tool": "cancel_pending_order", "arg": "reason", "allowed": ["no longer needed", "ordered by mistake"]}]
+}
+```
+
+- `requires[].after` may be a list: any one of them satisfies the prerequisite (two ways to authenticate).
+- `requires[].same_arg`: the earlier call must carry the same value of that argument. Reading the status of order A no longer licenses cancelling order B. A call without a readable `same_arg` is a violation.
+- `max_calls_per_arg`: at most `max` successful calls to `tools` per value of `arg`, e.g. one item change per order. A call whose result is an error is not counted: an agent that fixes a bad item id and retries changed the order once. A call without a readable `arg` is a violation.
+- `values`: the argument, when present, must be one of `allowed` (compared as text, trimmed).
+
+[`examples/policy_retail.json`](examples/policy_retail.json) applies these to the tau2-bench retail domain. On 180 real tau2 retail runs from an outside test (three `gpt-6-luna` baselines, a same-model candidate, a weaker model and a sabotaged prompt) it fires on 0 of the 120 baseline and same-model runs, 5 of 30 weaker-model runs and 1 of 30 sabotaged runs. Still not expressible: confirmation before a change, one tool call per turn, joins against earlier results (payment method on file, item availability, price difference), and anything semantic. A clean `policy` result is not a compliance certificate.
 
 Reasons name the step and the values: `step 4: modify_billing_record.customer_id 'C-999' != session enduser.id 'C-123'`. [`examples/policy_support.json`](examples/policy_support.json) is a complete customer-support policy. A malformed policy file exits 2.
 
@@ -280,7 +300,7 @@ Exit 1 on gate FAIL, so the job fails; PASS and INCONCLUSIVE pass (INCONCLUSIVE 
 - uploads an **audit artifact** (`faultgate-audit`): `verdict.json` (verdict, exit code, faultgate version, UTC time, every input file with its SHA-256, gate numbers), `failing_traces.json` (each failing trace and every reason) and `repro.sh`. No prompts, answers or tool payloads are copied into it, and reasons are masked by `redact`;
 - exposes the verdict as the step output `verdict`.
 
-Other inputs: `format`, `redact`, `checks`, `judge`, `report`, `audit`, `version`. The same files come from the CLI with `--markdown summary.md --audit audit/`. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes, with matching verdict outputs and audit files.
+Other inputs: `format`, `redact`, `checks`, `judge`, `report`, `audit`, `version`. `version` takes a version (`0.3.0`), a specifier (`>=0.3`), a full requirement (`faultgate==0.3.0`) or any pip spec (a path, `git+https://...`); the default is the latest release. The same files come from the CLI with `--markdown summary.md --audit audit/`. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes, with matching verdict outputs and audit files.
 
 ## How much to trust a verdict
 
@@ -300,7 +320,7 @@ For comparison, the same `search_loop` question put to judges instead of a rule:
 
 Read the table honestly:
 - `search_loop` is solid on this task family. The human coder saw the same structural signals, so κ measures agreement with that coding, not ground truth from nowhere.
-- `abstention` and `truncation` have one positive each to learn from. `abstention` is a phrase list; a paraphrase it doesn't know is a miss.
+- `abstention` and `truncation` have one positive each to learn from. `abstention` is a phrase list; a paraphrase it doesn't know is a miss. It was tuned on question-answering runs and then narrowed after an outside test on tau2 retail support runs, where "cannot" and "unable to" fired on 21 of 180 final answers that were policy reminders, authentication refusals and explanations of what a tool cannot do. It now fires on 1 of those 180 ("couldn't locate the ... payment method"); the P4 numbers above are unchanged.
 - `wrong_answer` agrees with the human verdict on all 21 answered runs. It is substring containment, case-insensitive: right for short factual answers, wrong for free-text ones — say what "expected" means for your task before you trust it.
 - `policy` has no human-labelled positives: FAULTLINE's agent rejects hostile calls before they become steps, so its traces never contain an executed attack. Recall is by construction on the P9 attack shapes; the number that matters is zero false positives on real runs.
 - `wrong_direction` is the only check that needs reading, and the only local judge we have is noise on it (fires on 39% of clean runs). It ships because the contract is the product: the day a local model scores κ ≥ 0.7 on it, that's a one-line adapter, and this harness is what proves it.

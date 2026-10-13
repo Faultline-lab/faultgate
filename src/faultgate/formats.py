@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from faultgate.trace import Span, Trace, load_otlp
+from faultgate.trace import Span, Trace, is_tool_span, load_otlp
 
 FORMATS = ("auto", "otlp", "openinference", "langfuse", "langsmith", "braintrust")
 USER_KEYS = ("enduser.id", "user.id", "user_id", "userId")
@@ -249,7 +249,9 @@ def _oi_messages(attrs: dict[str, Any], direction: str) -> list[dict[str, Any]]:
 
 
 def _openinference(t: Trace) -> Trace:
-    has_tool_spans = any(str(s.attrs.get("openinference.span.kind", "")).upper() == "TOOL" for s in t.spans)
+    # native OTel execute_tool spans next to OpenInference LLM spans (an app that traces its own tools and
+    # instruments the LLM client) are tool spans too: the calls in the LLM messages are the same calls
+    has_tool_spans = any(str(s.attrs.get("openinference.span.kind", "")).upper() == "TOOL" or is_tool_span(s) for s in t.spans)
     spans = []
     for s in t.spans:
         a = dict(s.attrs)
@@ -260,7 +262,8 @@ def _openinference(t: Trace) -> Trace:
                 md = json.loads(md) if isinstance(md, str) else md
             except ValueError:
                 md = None
-            a.update(_root_attrs(s.name, a.get("input.value"), a.get("output.value"), md, a.get("user.id")))
+            # a native GenAI root keeps its own attributes; the mapping only fills what is missing
+            a = {**_root_attrs(s.name, a.get("input.value"), a.get("output.value"), md, a.get("user.id")), **a}
         elif kind == "TOOL":
             args = a.get("tool.parameters", a.get("input.value"))
             a.update(_tool_attrs(str(a.get("tool.name", s.name)), args, a.get("output.value"), s.status_message or None))

@@ -69,3 +69,22 @@ def test_band_prints_hard_block(tmp_path, capsys):
                      "--golden", str(gate / "golden.json"), "--policy", str(p)])
     out = capsys.readouterr().out
     assert code == 1 and "gate: FAIL · policy violation in 30 trace(s) (hard block)" in out
+
+
+def test_output_parent_directories_are_created(tmp_path, capsys):
+    out = tmp_path / "not" / "yet" / "report.json"
+    md = tmp_path / "md" / "pr.md"
+    assert cli.main(["check", str(EXAMPLES), "--check", "repeated_call", "--json", str(out), "--markdown", str(md)]) == 0
+    assert json.loads(out.read_text())["fired"] == {"repeated_call": 0} and md.is_file()
+    band = tmp_path / "bands" / "band.json"
+    assert cli.main(["baseline", str(EXAMPLES), str(EXAMPLES), "--check", "repeated_call", "--out", str(band)]) == 0
+    assert band.is_file()
+
+
+def test_unwritable_output_exits_2_not_1(tmp_path, capsys):
+    """A clean run whose report cannot be written must not exit 1: in CI that reads as a gate FAIL."""
+    blocker = tmp_path / "file"
+    blocker.write_text("x")
+    assert cli.main(["check", str(EXAMPLES), "--check", "repeated_call", "--json", str(blocker / "report.json")]) == 2
+    captured = capsys.readouterr()
+    assert "0/5 traces failed" in captured.out and "cannot write output" in captured.err

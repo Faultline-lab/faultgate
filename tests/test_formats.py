@@ -243,3 +243,67 @@ def test_tool_errors_set_span_status_in_langsmith_and_braintrust(tmp_path):
         (t,) = load(_write(tmp_path, doc))
         tool = next(s for s in t.spans if s.name == "fetch")
         assert tool.status_code == 2 and tool.status_message == "boom" and t.steps[0].result == "Error: boom"
+
+
+# --- client test, 2026-10-13: what precheck passed was not what check read ---
+
+def _attr(k, v):
+    return {"key": k, "value": {"stringValue": v}}
+
+
+def _names_only_doc():
+    """invoke_agent / execute_tool named by span name, with the README's attributes but no gen_ai.operation.name."""
+    root = _span("1" * 16, name="invoke_agent", start="10", end="90",
+                 attributes=[_attr("gen_ai.prompt", "cancel #W1"), _attr("gen_ai.completion", "done")])
+    tools = [_span(f"{i + 2:016d}", parent="1" * 16, name="execute_tool", start=str(20 + i), end=str(21 + i),
+                   attributes=[_attr("gen_ai.tool.name", "get_order_details"), _attr("gen_ai.tool.call.arguments", '{"order_id": "#W1"}'),
+                               _attr("gen_ai.tool.call.result", '{"status": "pending"}')]) for i in range(3)]
+    return _otlp([root, *tools])
+
+
+def test_tool_spans_named_by_span_name_are_read(tmp_path, capsys):
+    p = tmp_path / "names.json"
+    p.write_text(json.dumps(_names_only_doc()))
+    (t,) = load(p)
+    assert [s.tool for s in t.steps] == ["get_order_details"] * 3
+    from faultgate.checks import repeated_call_rule
+    assert repeated_call_rule(t).detected  # was 0 steps: every structural check was blind
+    assert cli.main(["precheck", str(p)]) == 0
+    out = capsys.readouterr().out
+    assert "3 tool steps read" in out and "recognised by span name only" in out
+
+
+def test_precheck_warns_on_tool_attributes_it_does_not_read(tmp_path, capsys):
+    doc = _names_only_doc()
+    for s in doc["resourceSpans"][0]["scopeSpans"][0]["spans"][1:]:
+        s["name"] = "tool:get_order_details"
+    p = tmp_path / "unread.json"
+    p.write_text(json.dumps(doc))
+    assert cli.main(["precheck", str(p)]) == 0
+    out = capsys.readouterr().out
+    assert "0 tool steps read" in out and "3 span(s) carry tool attributes but are not read" in out
+
+
+def test_mixed_native_and_openinference_export_counts_each_call_once(tmp_path, capsys):
+    """An app that traces its own tools (native GenAI spans) and instruments the LLM client with OpenInference.
+    Auto-detect picks openinference; the LLM's tool-call messages are the same calls as the tool spans."""
+    root = _span("1" * 16, name="invoke_agent", start="10", end="90",
+                 attributes=[_attr("gen_ai.operation.name", "invoke_agent"), _attr("gen_ai.agent.name", "retail"),
+                             _attr("gen_ai.prompt", "cancel #W1"), _attr("gen_ai.completion", "done")])
+    llm = _span("2" * 16, parent="1" * 16, name="completion", start="20", end="30", attributes=[
+        _attr("openinference.span.kind", "LLM"),
+        _attr("llm.output_messages.0.message.role", "assistant"),
+        _attr("llm.output_messages.0.message.tool_calls.0.tool_call.id", "call_1"),
+        _attr("llm.output_messages.0.message.tool_calls.0.tool_call.function.name", "get_order_details"),
+        _attr("llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments", '{"order_id": "#W1"}')])
+    tool = _span("3" * 16, parent="1" * 16, name="execute_tool", start="40", end="50", attributes=[
+        _attr("gen_ai.operation.name", "execute_tool"), _attr("gen_ai.tool.name", "get_order_details"),
+        _attr("gen_ai.tool.call.arguments", '{"order_id": "#W1"}'), _attr("gen_ai.tool.call.result", '{"status": "pending"}')])
+    p = tmp_path / "mixed.json"
+    p.write_text(json.dumps(_otlp([root, llm, tool])))
+    assert detect(json.loads(p.read_text())) == "openinference"
+    (auto,), (otlp,) = load(p), load(p, "otlp")
+    assert [(s.tool, s.arguments, s.result) for s in auto.steps] == [(s.tool, s.arguments, s.result) for s in otlp.steps]
+    assert len(auto.steps) == 1 and auto.agent == "retail"
+    assert cli.main(["precheck", str(p)]) == 0
+    assert "mixed export" in capsys.readouterr().out

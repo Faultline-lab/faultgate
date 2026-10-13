@@ -31,20 +31,36 @@ def _luhn(digits: str) -> bool:
     return total % 10 == 0
 
 
-def _card(m: re.Match[str]) -> bool:
-    digits = re.sub(r"\D", "", m.group(0))
-    return 13 <= len(digits) <= 19 and _luhn(digits)
+def _card(m: re.Match[str], tag: str) -> str:
+    """Mask every Luhn-valid 13-19 digit window of whole digit groups in a run of groups.
+
+    The run can carry more than the card: an SSN or an order number written next to it
+    ("4111 1111 1111 1111 123-45-6789"). Testing only the whole run let the card through.
+    """
+    text = m.group(0)
+    groups = [(g.start(), g.end()) for g in re.finditer(r"\d+", text)]
+    out, done, i = [], 0, 0
+    while i < len(groups):
+        for j in range(len(groups), i, -1):
+            digits = "".join(text[a:b] for a, b in groups[i:j])
+            if 13 <= len(digits) <= 19 and _luhn(digits):
+                out += [text[done:groups[i][0]], tag]
+                done, i = groups[j - 1][1], j
+                break
+        else:
+            i += 1
+    return "".join(out) + text[done:]
 
 
-def _phone(m: re.Match[str]) -> bool:
-    return 9 <= len(re.sub(r"\D", "", m.group(0))) <= 15
+def _phone(m: re.Match[str], tag: str) -> str:
+    return tag if 9 <= len(re.sub(r"\D", "", m.group(0))) <= 15 else m.group(0)
 
 
-# Order matters: secrets and cards before the looser phone / IP patterns.
+# Order matters: secrets, SSNs and cards before the looser phone / IP patterns.
 # Every pattern is anchored by a lookbehind (so a match can only start at a token boundary) and every
 # repetition is bounded: worst case is linear in the input, whatever an agent wrote into its trace.
 TOKEN = r"[A-Za-z0-9_-]"
-PATTERNS: list[tuple[str, re.Pattern[str], Callable[[re.Match[str]], bool] | None]] = [
+PATTERNS: list[tuple[str, re.Pattern[str], Callable[[re.Match[str], str], str] | None]] = [
     ("SECRET", re.compile(r"(?<![\w.-])eyJ[A-Za-z0-9_-]{8,4096}\.[A-Za-z0-9_-]{8,4096}\.[A-Za-z0-9_-]{8,4096}"), None),
     ("SECRET", re.compile(r"(?i)(?<=bearer )[A-Za-z0-9._~+/-]{16,4096}=*"), None),
     ("SECRET", re.compile(
@@ -60,8 +76,10 @@ PATTERNS: list[tuple[str, re.Pattern[str], Callable[[re.Match[str]], bool] | Non
         r")(?![\w-])"), None),
     ("EMAIL", re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}"
                          r"\.[A-Za-z]{2,24}(?![A-Za-z0-9-])"), None),
-    ("CREDIT_CARD", re.compile(r"(?<![\w.])\d(?:[ -]?\d){12,18}(?![\w.])"), _card),
+    # SSNs before cards: an SSN written beside a card must not join its digit run
     ("US_SSN", re.compile(r"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b"), None),
+    # a run of digit groups (cards are written 4-4-4-4, 4-6-5 or unbroken); a sentence's full stop may follow, a decimal may not
+    ("CREDIT_CARD", re.compile(r"(?<![\w.])\d{3,19}(?:[ -]\d{3,19}){0,15}+(?!\w)(?!\.\d)"), _card),
     ("IP_ADDRESS", re.compile(r"(?<![\w.])(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?![\w.])"), None),
     ("IP_ADDRESS", re.compile(r"(?<![\w:])(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}(?![\w:])"), None),
     # a phone is a whole number group: not part of a longer run of digit blocks (a card that failed Luhn, an id)
@@ -80,8 +98,9 @@ class Redactor:
 
 
 def _builtin(text: str) -> str:
-    for kind, rx, ok in PATTERNS:
-        text = rx.sub(lambda m: f"<{kind}>" if ok is None or ok(m) else m.group(0), text)
+    for kind, rx, sub in PATTERNS:
+        tag = f"<{kind}>"
+        text = rx.sub(lambda m: tag if sub is None else sub(m, tag), text)
     return text
 
 

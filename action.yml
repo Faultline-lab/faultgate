@@ -13,7 +13,7 @@ inputs:
   report:  { description: "path to write the JSON report", required: false, default: "faultgate-report.json" }
   audit:   { description: "directory for verdict.json, failing_traces.json and repro.sh (uploaded as an artifact)", required: false, default: "faultgate-audit" }
   comment: { description: "on pull requests, post or update one summary comment (needs pull-requests: write)", required: false, default: "true" }
-  version: { description: "faultgate version spec, or a path/VCS spec for pip", required: false, default: "faultgate" }
+  version: { description: "faultgate to install: a version (0.3.0), a pip specifier (>=0.3), a full requirement (faultgate==0.3.0), or a path/VCS spec for pip", required: false, default: "faultgate" }
 outputs:
   verdict: { description: "PASS, FAIL or INCONCLUSIVE", value: "${{ steps.gate.outputs.verdict }}" }
 # Inputs reach the shell only as environment variables, never spliced into script text.
@@ -26,7 +26,14 @@ runs:
       env:
         VERSION: ${{ inputs.version }}
       run: |
-        pip install --quiet "$VERSION"
+        # a bare version or specifier names faultgate's version; anything else goes to pip as written
+        case "$VERSION" in
+          [0-9]*)                       spec="faultgate==$VERSION" ;;
+          v[0-9]*)                      spec="faultgate==${VERSION#v}" ;;
+          "=="*|">"*|"<"*|"~="*|"!="*)  spec="faultgate$VERSION" ;;
+          *)                            spec="$VERSION" ;;
+        esac
+        pip install --quiet "$spec"
     - id: gate
       shell: bash
       env:

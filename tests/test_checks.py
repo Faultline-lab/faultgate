@@ -1,3 +1,5 @@
+import pytest
+
 from faultgate.checks import CHECKS, _empty_result, search_loop_rule
 from faultgate.trace import load_otlp
 from tests.conftest import EXAMPLES
@@ -368,3 +370,47 @@ def test_context_overflow_odd_finish_reason_values():
     for raw in (123, {"reason": "MAX_TOKENS"}, ["stop", 123], None, []):
         context_overflow_rule(_make_trace([], {"gen_ai.response.finish_reasons": raw}))  # never raises
     assert context_overflow_rule(_make_trace([], {"gen_ai.response.finish_reasons": ["stop", 123, "length"]})).detected
+
+
+# Client test, 2026-10-13 (tau2 retail): real final answers the old "cannot / unable to" list flagged.
+# A support agent reminding the customer of a rule, refusing an unauthenticated request or explaining what
+# a tool cannot do has not abstained. Frozen from the client's runs.
+SUPPORT_NOT_ABSTAINING = [
+    "Both changes are complete. Both orders remain pending, and their item changes cannot be modified again.",
+    "I’m unable to verify an account using a username and ZIP code. Please provide the email address on the account.",
+    "The order remains pending, but its items can’t be modified again or the order cancelled.",
+    "The order status changed to return requested, so I couldn’t submit the exchanges through the available process.",
+    "Note: the order details returned by the system show inconsistent item information, so I can’t reliably confirm the updated item options here.",
+    "The order cannot be canceled because it has already been marked for return.",
+    "I am unable to directly check the return window or escalate to a specialist.",
+    "I couldn’t submit the return with PayPal because the return system requires refunds to go to the original payment method.",
+]
+ABSTAINING = [
+    "I couldn’t verify the external auditor for Aster Labs from the available documents—the searches returned no matching source.",
+    "It appears that I couldn't locate the specific credit card payment method to process the refund.",
+    "I could not find any record of that order.",
+    "I was unable to determine who signed the contract.",
+    "No relevant documents mention the merger.",
+    "The requested information is not available in the knowledge base.",
+    "I don't know.",
+]
+
+
+@pytest.mark.parametrize("answer", SUPPORT_NOT_ABSTAINING)
+def test_abstention_ignores_support_reminders_and_refusals(answer):
+    from faultgate.checks import abstention_rule
+    from faultgate.trace import Span, Trace
+
+    root = Span(span_id="r", parent_id=None, name="invoke_agent", start_ns=1,
+                attrs={"gen_ai.operation.name": "invoke_agent", "gen_ai.completion": answer})
+    assert not abstention_rule(Trace(trace_id="t", agent="a", spans=[root])).detected
+
+
+@pytest.mark.parametrize("answer", ABSTAINING)
+def test_abstention_catches_information_not_found(answer):
+    from faultgate.checks import abstention_rule
+    from faultgate.trace import Span, Trace
+
+    root = Span(span_id="r", parent_id=None, name="invoke_agent", start_ns=1,
+                attrs={"gen_ai.operation.name": "invoke_agent", "gen_ai.completion": answer})
+    assert abstention_rule(Trace(trace_id="t", agent="a", spans=[root])).detected

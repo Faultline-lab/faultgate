@@ -92,7 +92,7 @@ class Trace(BaseModel):
 
     @property
     def steps(self) -> list[Step]:
-        exec_spans = [s for s in self.spans if s.attrs.get("gen_ai.operation.name") == "execute_tool"]
+        exec_spans = [s for s in self.spans if is_tool_span(s)]
         exec_steps = [
             Step(
                 index=i + 1,
@@ -179,6 +179,15 @@ class Trace(BaseModel):
         omitted = len(lines) - len(keep_head) - len(tail)
         middle = [f"... {omitted} steps omitted ..."] if omitted > 0 else []
         return "\n".join(head + keep_head + middle + tail)
+
+
+def is_tool_span(s: Span) -> bool:
+    """A tool execution: ``gen_ai.operation.name`` says so, or, when the exporter left that attribute out,
+    the semconv span name does (``execute_tool`` / ``execute_tool {gen_ai.tool.name}``)."""
+    op = s.attrs.get("gen_ai.operation.name")
+    if op is not None:
+        return op == "execute_tool"
+    return s.name == "execute_tool" or s.name.startswith("execute_tool ")
 
 
 def _trim(s: str, n: int | None) -> str:
