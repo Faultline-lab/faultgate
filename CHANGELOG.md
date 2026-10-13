@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 — 2026-10-13
 
 Fixes from the first outside test (tau2-bench retail, 180 real runs, 2026-10-13).
 
