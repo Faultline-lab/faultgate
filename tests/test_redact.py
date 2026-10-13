@@ -17,6 +17,8 @@ R = builtin()
     ("mail jane.doe+x@corp.example.com now", "EMAIL"),
     ("card 4111 1111 1111 1111 on file", "CREDIT_CARD"),
     ("card 4111-1111-1111-1111", "CREDIT_CARD"),
+    ("card on file: 4111 1111 1111 1111.", "CREDIT_CARD"),       # end of a sentence
+    ("amex 3782 822463 10005 charged", "CREDIT_CARD"),            # 4-6-5 grouping
     ("ssn 123-45-6789", "US_SSN"),
     ("call +1 (415) 555-0132 today", "PHONE"),
     ("call 020 7946 0958", "PHONE"),
@@ -177,3 +179,39 @@ def test_scenario_keys_are_masked_but_stay_unique_and_stable():
     assert bandmod.evaluate(runs[2], b)["missing"] == []
     raw = run([trace("x", keys[0])], select("abstention"), None)
     assert raw.results[0].scenario == keys[0]  # redaction off: untouched
+
+
+# Client test, 2026-10-13: a card written next to an SSN joined its digit run, failed Luhn as a whole, and leaked
+# into report.json, the Markdown summary and failing_traces.json.
+CARD, SSN, MAIL = "4111 1111 1111 1111", "123-45-6789", "fake.person@example.test"
+
+
+@pytest.mark.parametrize("text, expected", [
+    (f"{MAIL} {CARD} {SSN} sk-test" + "A" * 30, "<EMAIL> <CREDIT_CARD> <US_SSN> <SECRET>"),
+    (f"{SSN} {CARD}", "<US_SSN> <CREDIT_CARD>"),
+    (f"{CARD} order 1234", "<CREDIT_CARD> order 1234"),
+    (f"{CARD} 5555 4444 3333 1111", "<CREDIT_CARD> <CREDIT_CARD>"),
+    (f"{CARD}-123", "<CREDIT_CARD>-123"),
+])
+def test_adjacent_pii_is_masked_separately(text, expected):
+    assert R(text) == expected
+
+
+def test_adjacent_pii_never_reaches_any_output(tmp_path):
+    doc = json.loads(EXAMPLES.read_text(encoding="utf-8"))
+    for s in doc["resourceSpans"][0]["scopeSpans"][0]["spans"]:
+        if not s.get("parentSpanId"):
+            s["attributes"].append({"key": "enduser.id", "value": {"stringValue": "customer_1"}})
+        for a in s["attributes"]:
+            if a["key"] == "gen_ai.tool.call.arguments":
+                a["value"] = {"stringValue": json.dumps({"user_id": f"{MAIL} {CARD} {SSN}"})}
+    tr, pol = tmp_path / "t.json", tmp_path / "p.json"
+    tr.write_text(json.dumps(doc))
+    pol.write_text(json.dumps({"identity": {"arg": "user_id"}}))
+    out, md, audit = tmp_path / "r.json", tmp_path / "pr.md", tmp_path / "audit"
+    assert cli.main(["check", str(tr), "--policy", str(pol), "--check", "policy",
+                     "--json", str(out), "--markdown", str(md), "--audit", str(audit)]) == 1
+    texts = [out.read_text(encoding="utf-8"), md.read_text(encoding="utf-8")] + [f.read_text(encoding="utf-8") for f in audit.iterdir()]
+    for raw in (MAIL, CARD, SSN, CARD.replace(" ", "")):
+        assert not any(raw in t for t in texts), raw
+    assert "<EMAIL> <CREDIT_CARD> <US_SSN>" in texts[0]

@@ -1,0 +1,21 @@
+{
+ "allow": ["calculate", "cancel_pending_order", "exchange_delivered_order_items", "find_user_id_by_email", "find_user_id_by_name_zip",
+           "get_item_details", "get_order_details", "get_product_details", "get_user_details", "list_all_product_types",
+           "modify_pending_order_address", "modify_pending_order_items", "modify_pending_order_payment", "modify_user_address",
+           "return_delivered_order_items", "transfer_to_human_agents"],
+ "requires": [
+  {"tool": "get_user_details", "after": ["find_user_id_by_email", "find_user_id_by_name_zip"]},
+  {"tool": "cancel_pending_order", "after": "get_order_details", "result_contains": "pending", "same_arg": "order_id"},
+  {"tool": "modify_pending_order_address", "after": "get_order_details", "result_contains": "pending", "same_arg": "order_id"},
+  {"tool": "modify_pending_order_items", "after": "get_order_details", "result_contains": "pending", "same_arg": "order_id"},
+  {"tool": "modify_pending_order_payment", "after": "get_order_details", "result_contains": "pending", "same_arg": "order_id"},
+  {"tool": "return_delivered_order_items", "after": "get_order_details", "result_contains": "delivered", "same_arg": "order_id"},
+  {"tool": "exchange_delivered_order_items", "after": "get_order_details", "result_contains": "delivered", "same_arg": "order_id"}
+ ],
+ "max_calls_per_arg": [
+  {"tools": ["exchange_delivered_order_items", "modify_pending_order_items"], "arg": "order_id", "max": 1}
+ ],
+ "values": [
+  {"tool": "cancel_pending_order", "arg": "reason", "allowed": ["no longer needed", "ordered by mistake"]}
+ ]
+}

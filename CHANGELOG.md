@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+Fixes from the first outside test (tau2-bench retail, 180 real runs, 2026-10-13).
+
+- Redaction: a card number written next to another number (`4111 1111 1111 1111 123-45-6789`) joined its digit run, failed the Luhn check as a whole and was written unmasked to the JSON report, the Markdown summary and `failing_traces.json`. Cards are now found as Luhn-valid windows of whole digit groups, SSNs are masked first, and a card at the end of a sentence (`...1111.`) is masked too (it was also missed).
+- Tool spans named `execute_tool` / `execute_tool <tool>` without `gen_ai.operation.name` are read as tool calls. Before, every structural check saw zero steps on such exports while `precheck` passed them clean.
+- `precheck` reports the tool steps it read and warns on tool spans recognised by name only, spans with tool attributes that are not read as steps, and mixed native / OpenInference exports.
+- Auto-detect: an OTLP export with native `execute_tool` spans and OpenInference LLM spans was read as OpenInference and counted every tool call twice (once from the span, once from the LLM message). The tool spans are now the steps, as with `--format otlp`; the native root keeps its own agent name.
+- An output file that cannot be written exits 2 instead of crashing with exit 1 (which CI reads as a gate FAIL); parent directories of `--json`, `--markdown` and `baseline --out` are created.
+- GitHub Action: `version: 0.3.0` was passed to pip as a package name. A bare version, `v`-prefixed version or specifier now installs that faultgate version; any other value goes to pip unchanged.
+- `abstention` no longer fires on a bare `cannot` / `unable to`: the inability has to be about finding the information. On the 180 retail runs it fired on 21 final answers that were policy reminders, authentication refusals or explanations of what a tool cannot do; now 1. FAULTLINE P4 calibration unchanged (1/1, 0 FP on 200).
+- Policy, order-level rules: `requires[].after` takes a list of alternatives, `requires[].same_arg` binds the prerequisite to the same argument value (the order looked up is the order changed), `max_calls_per_arg` caps successful calls per argument value (one exchange per order), `values` allowlists an argument. `examples/policy_retail.json` uses them: 0 fires on 120 baseline and same-model retail runs, 5/30 on a weaker model.
+
 ## 0.3.0 — 2026-10-12
 
 - Policy business rules in `policy.json`: `limits` (numeric min/max on a tool argument, dotted paths, `"$1,200.50"` parsed), `identity` (argument must equal the root span's `enduser.id` or another `session_attr`), `requires` (tool order prerequisites, optionally on the earlier result). Each fails closed when it cannot be checked. Malformed keys exit 2.

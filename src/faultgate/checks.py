@@ -74,10 +74,15 @@ def search_loop_rule(t: Trace, step_cap: int = 12, empty_share: float = 0.5) -> 
     return Verdict(fired, 1.0, f"no answer, {len(steps)} steps{' (cap)' if capped else ''}, {empty:.0%} empty results")
 
 
+# "could not" alone is not abstention: a support agent that "cannot modify the order again" or is "unable to
+# verify" an unauthenticated caller did its job. The inability has to be about finding the information.
 ABSTAIN = re.compile(
-    r"\b(couldn.t|could not|cannot|can.t|unable to|not able to|"
-    r"no (?:matching |relevant )?(?:document|information|record|result)s?|not (?:found|available)|"
-    r"did not find|didn.t find|wasn.t able)\b",
+    r"\b(?:couldn.t|could not|cannot|can.t|unable to|not able to|wasn.t able to|was not able to|did not|didn.t|failed to)"
+    r"\s+(?:\w+\s+){0,2}?(?:find|locate|retrieve|identify|determine|look\s?up|discover)\b"
+    r"|\bno (?:matching |relevant )?(?:document|information|record|result|source|data)s?\b"
+    r"|\b(?:information|answer|record|result|document|data)s? (?:(?:was|were|is|are) )?not (?:found|available)\b"
+    r"|\bnot found\b"
+    r"|\b(?:don.t|do not) (?:know|have (?:that|this|any|enough|the) information)\b",
     re.I,
 )
 
@@ -87,6 +92,8 @@ def abstention_rule(t: Trace) -> Verdict:
 
     Calibrated on FAULTLINE P4 labels: 1/1 caught, 0 false positives on 200 — but one
     positive is one positive; a paraphrase this list does not know will be missed.
+    On 180 tau2 retail support runs it fires once ("couldn't locate the ... payment method");
+    the earlier "cannot / unable to" list fired 21 times, on policy reminders and refusals.
     """
     ans = t.answer.strip()
     if not ans:
@@ -114,10 +121,29 @@ class Identity:
 
 @dataclass(frozen=True)
 class Requirement:
-    """``tool`` may only run after an earlier ``after`` call (whose result contains ``result_contains``, if set)."""
+    """``tool`` may only run after an earlier call to one of ``after`` (whose result contains ``result_contains``,
+    if set, and whose ``same_arg`` argument equals this call's, if set: the order that was looked up is the order changed)."""
     tool: str
-    after: str
+    after: tuple[str, ...]
     result_contains: str | None = None
+    same_arg: str | None = None
+
+
+@dataclass(frozen=True)
+class PerValueBudget:
+    """At most ``max`` successful calls to ``tools`` per value of ``arg``, e.g. one exchange per order_id.
+    A call that returned an error changed nothing: an agent that fixes a bad item id and retries modified the order once."""
+    tools: frozenset[str]
+    arg: str
+    max: int
+
+
+@dataclass(frozen=True)
+class AllowedValues:
+    """``tool``'s ``arg`` must be one of ``allowed``, e.g. a cancellation reason from a fixed list."""
+    tool: str
+    arg: str
+    allowed: tuple[str, ...]
 
 
 def _is_num(v: Any) -> bool:
@@ -134,12 +160,21 @@ def _shape(where: str, d: Any, required: set[str], optional: set[str]) -> dict[s
     if unknown:
         raise ValueError(f"policy: {where} has unknown keys {sorted(unknown)}")
     for k in (required | optional) & set(d):
-        if k in ("min", "max"):
+        if k == "max" and "per_arg" in where:
+            if not isinstance(d[k], int) or isinstance(d[k], bool) or d[k] < 1:
+                raise ValueError(f"policy: {where}.max must be a whole number >= 1")
+        elif k in ("min", "max"):
             if not _is_num(d[k]) or not math.isfinite(d[k]):
                 raise ValueError(f"policy: {where}.{k} must be a finite number")
         elif k == "tools":
             if not isinstance(d[k], list) or not all(isinstance(x, str) for x in d[k]):
                 raise ValueError(f"policy: {where}.tools must be a list of tool names")
+        elif k == "after":
+            if not (isinstance(d[k], str) or (isinstance(d[k], list) and d[k] and all(isinstance(x, str) for x in d[k]))):
+                raise ValueError(f"policy: {where}.after must be a tool name or a list of tool names")
+        elif k == "allowed":
+            if not isinstance(d[k], list) or not d[k] or not all(isinstance(x, str) for x in d[k]):
+                raise ValueError(f"policy: {where}.allowed must be a list of strings")
         elif not isinstance(d[k], str):
             raise ValueError(f"policy: {where}.{k} must be a string")
     return d
@@ -158,8 +193,8 @@ class Policy:
 
     ``allow``/``max_calls``/``max_arg_chars`` are off until you set them (a policy.json);
     ``deny_patterns`` catches path traversal and local-file reads out of the box.
-    ``limits``/``identity``/``requires`` are business rules on argument values and tool order;
-    each fails closed when it cannot be checked.
+    ``limits``/``identity``/``requires``/``max_calls_per_arg``/``values`` are business rules on argument values
+    and tool order; each fails closed when it cannot be checked.
     """
     allow: frozenset[str] | None = None
     max_calls: int | None = None
@@ -168,6 +203,8 @@ class Policy:
     limits: tuple[Limit, ...] = ()
     identity: Identity | None = None
     requires: tuple[Requirement, ...] = ()
+    max_calls_per_arg: tuple[PerValueBudget, ...] = ()
+    values: tuple[AllowedValues, ...] = ()
 
     @classmethod
     def load(cls, path: str | Path) -> "Policy":
@@ -175,7 +212,8 @@ class Policy:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Policy":
-        unknown = set(d) - {"allow", "max_calls", "max_arg_chars", "deny_patterns", "limits", "identity", "requires"}
+        unknown = set(d) - {"allow", "max_calls", "max_arg_chars", "deny_patterns", "limits", "identity", "requires",
+                            "max_calls_per_arg", "values"}
         if unknown:
             raise ValueError(f"policy: unknown keys {sorted(unknown)}")
         limits = []
@@ -192,9 +230,20 @@ class Policy:
             identity = Identity(x["arg"], x.get("session_attr", "enduser.id"),
                                 frozenset(x["tools"]) if "tools" in x else None)
         requires = [
-            Requirement(x["tool"], x["after"], x.get("result_contains"))
-            for i, x in enumerate(_shape(f"requires[{i}]", r, {"tool", "after"}, {"result_contains"})
-                                  for i, r in enumerate(_items(d, "requires")))
+            Requirement(x["tool"], tuple([x["after"]] if isinstance(x["after"], str) else x["after"]),
+                        x.get("result_contains"), x.get("same_arg"))
+            for x in (_shape(f"requires[{i}]", r, {"tool", "after"}, {"result_contains", "same_arg"})
+                      for i, r in enumerate(_items(d, "requires")))
+        ]
+        budgets = [
+            PerValueBudget(frozenset(x["tools"]), x["arg"], x["max"])
+            for x in (_shape(f"max_calls_per_arg[{i}]", b, {"tools", "arg", "max"}, set())
+                      for i, b in enumerate(_items(d, "max_calls_per_arg")))
+        ]
+        values = [
+            AllowedValues(x["tool"], x["arg"], tuple(x["allowed"]))
+            for x in (_shape(f"values[{i}]", v, {"tool", "arg", "allowed"}, set())
+                      for i, v in enumerate(_items(d, "values")))
         ]
         return cls(
             allow=frozenset(d["allow"]) if "allow" in d else None,
@@ -204,6 +253,8 @@ class Policy:
             limits=tuple(limits),
             identity=identity,
             requires=tuple(requires),
+            max_calls_per_arg=tuple(budgets),
+            values=tuple(values),
         )
 
 
@@ -282,13 +333,58 @@ def _business_violations(t: Trace, st: Step, earlier: list[Step], policy: Policy
             elif str(raw).strip() != str(session).strip():
                 bad.append(f"step {st.index}: {st.tool}.{ident.arg} {str(raw).strip()!r} != session "
                            f"{ident.session_attr} {str(session).strip()!r}")
+    for allowed in policy.values:
+        if st.tool != allowed.tool:
+            continue
+        if args is None:
+            bad.append(f"step {st.index}: {st.tool} arguments are not a JSON object, cannot check {allowed.arg}")
+            continue
+        raw = _dig(args, allowed.arg)
+        if raw is not _ABSENT and str(raw).strip() not in allowed.allowed:
+            bad.append(f"step {st.index}: {st.tool}.{allowed.arg} {str(raw).strip()!r} not in allowed values")
     for req in policy.requires:
         if st.tool != req.tool:
             continue
-        if not any(e.tool == req.after and (req.result_contains is None or req.result_contains in e.result)
-                   for e in earlier):
-            cond = f" returned {req.result_contains!r}" if req.result_contains is not None else ""
-            bad.append(f"step {st.index}: {st.tool} before {req.after}{cond}")
+        cond = f" returned {req.result_contains!r}" if req.result_contains is not None else ""
+        if req.same_arg is None:
+            ok = any(e.tool in req.after and (req.result_contains is None or req.result_contains in e.result) for e in earlier)
+        else:
+            mine = _dig(args, req.same_arg) if args is not None else _ABSENT
+            if mine is _ABSENT:
+                bad.append(f"step {st.index}: {st.tool} has no readable {req.same_arg}, cannot match it to {' or '.join(req.after)}")
+                continue
+            cond += f" for the same {req.same_arg} {str(mine).strip()!r}"
+            ok = any(e.tool in req.after and (req.result_contains is None or req.result_contains in e.result)
+                     and _same(e, req.same_arg, mine) for e in earlier)
+        if not ok:
+            bad.append(f"step {st.index}: {st.tool} before {' or '.join(req.after)}{cond}")
+    return bad
+
+
+def _same(step: Step, arg: str, value: Any) -> bool:
+    args = _args_object(step.arguments)
+    other = _dig(args, arg) if args is not None else _ABSENT
+    return other is not _ABSENT and str(other).strip() == str(value).strip()
+
+
+def _budget_violations(steps: list[Step], policy: Policy) -> list[str]:
+    """Successful calls over a per-value budget."""
+    bad: list[str] = []
+    for b in policy.max_calls_per_arg:
+        seen: dict[str, list[int]] = {}
+        for st in steps:
+            if st.tool not in b.tools or _is_structural_error(st.result)[0]:
+                continue
+            args = _args_object(st.arguments)
+            v = _dig(args, b.arg) if args is not None else _ABSENT
+            if v is _ABSENT:
+                bad.append(f"step {st.index}: {st.tool} has no readable {b.arg}, cannot count it against max {b.max} per {b.arg}")
+                continue
+            idx = seen.setdefault(str(v).strip(), [])
+            idx.append(st.index)
+            if len(idx) == b.max + 1:
+                bad.append(f"step {st.index}: {len(idx)} successful {'/'.join(sorted(b.tools))} calls for {b.arg} "
+                           f"{str(v).strip()!r} > max {b.max} (steps {', '.join(map(str, idx))})")
     return bad
 
 
@@ -307,6 +403,7 @@ def policy_rule(t: Trace, policy: Policy) -> Verdict:
         if policy.max_arg_chars is not None and len(st.arguments) > policy.max_arg_chars:
             bad.append(f"step {st.index}: arguments {len(st.arguments)} chars > {policy.max_arg_chars}")
         bad += _business_violations(t, st, steps[:i], policy)
+    bad += _budget_violations(steps, policy)
     if policy.max_calls is not None and len(steps) > policy.max_calls:
         bad.append(f"{len(steps)} tool calls > max {policy.max_calls}")
     return Verdict(bool(bad), 1.0, "; ".join(bad) if bad else f"{len(steps)} calls within policy")
@@ -571,7 +668,7 @@ CHECKS: dict[str, Check] = {
         Check(
             "policy",
             "A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, call budget, "
-            "argument limit, identity mismatch, or missing prerequisite.",
+            "argument limit, identity mismatch, missing prerequisite, per-value budget, or value not allowed.",
             rule=partial(policy_rule, policy=Policy()),
         ),
         Check(

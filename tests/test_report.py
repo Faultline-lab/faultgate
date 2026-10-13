@@ -194,7 +194,8 @@ gh() {
     *--paginate*) [ -n "$FAKE_LOOKUP_FAIL" ] && return 1; [ -n "$FAKE_EXISTING" ] && echo "$FAKE_EXISTING"; return 0 ;;
   esac
 }
-pip() { :; }
+pip() { printf '%s
+' "$@" > "$FAKE_DIR/pip.args"; }
 '''
 
 
@@ -255,3 +256,20 @@ def test_action_final_step_fails_closed(tmp_path):
     assert _bash(final, {"CODE": ""}, tmp_path).returncode == 2
     assert _bash(final, {"CODE": "0"}, tmp_path).returncode == 0
     assert _bash(final, {"CODE": "1"}, tmp_path).returncode == 1
+
+
+@needs_bash
+@__import__("pytest").mark.parametrize("version, spec", [
+    ("0.3.0", "faultgate==0.3.0"),          # the client's input: pip read it as a package called 0.3.0
+    ("v0.3.0", "faultgate==0.3.0"),
+    (">=0.3", "faultgate>=0.3"),
+    ("==0.3.0", "faultgate==0.3.0"),
+    ("faultgate==0.3.0", "faultgate==0.3.0"),
+    ("faultgate", "faultgate"),
+    (".", "."),
+    ("git+https://github.com/Faultline-lab/faultgate@main", "git+https://github.com/Faultline-lab/faultgate@main"),
+])
+def test_action_version_input_becomes_a_pip_requirement(tmp_path, version, spec):
+    install = next(s for s in _run_scripts() if "pip install" in s)
+    assert _bash(install, {"VERSION": version}, tmp_path).returncode == 0
+    assert (tmp_path / "pip.args").read_text().splitlines() == ["install", "--quiet", spec]

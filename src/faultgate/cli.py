@@ -110,18 +110,30 @@ def cmd_check(args: argparse.Namespace) -> int:
         if g["regressions"]:
             print(f"regressions (clean in every baseline, not now): {', '.join(g['regressions'])}")
         code = 1 if g["verdict"] == "FAIL" else 0
-    if args.json:
-        Path(args.json).write_text(json.dumps(out, indent=1), encoding="utf-8")
-        print(f"report written to {args.json}")
     command = _repro(getattr(args, "argv", None) or ["check", args.traces])
-    if args.markdown:
-        Path(args.markdown).write_text(markdown(report, out.get("gate"), band, command), encoding="utf-8")
-        print(f"markdown written to {args.markdown}")
-    if args.audit:
-        inputs = {"traces": args.traces, "band": args.band, "policy": args.policy, "golden": args.golden}
-        write_audit(args.audit, report, out.get("gate"), inputs, command, code)
-        print(f"audit written to {args.audit}")
+    try:
+        if args.json:
+            _write(args.json, json.dumps(out, indent=1))
+            print(f"report written to {args.json}")
+        if args.markdown:
+            _write(args.markdown, markdown(report, out.get("gate"), band, command))
+            print(f"markdown written to {args.markdown}")
+        if args.audit:
+            inputs = {"traces": args.traces, "band": args.band, "policy": args.policy, "golden": args.golden}
+            write_audit(args.audit, report, out.get("gate"), inputs, command, code)
+            print(f"audit written to {args.audit}")
+    except OSError as e:
+        # an output that could not be written is a usage error, not a gate verdict: exit 1 would read as FAIL
+        print(f"faultgate: cannot write output: {e}", file=sys.stderr)
+        return 2
     return code
+
+
+def _write(path: str, text: str) -> None:
+    """Write an output file, creating its parent directories."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
 
 
 OUTPUT_FLAGS = {"--json", "--markdown", "--audit"}
@@ -160,7 +172,11 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     except (ValueError, KeyError, OSError) as e:
         print(f"faultgate: {e}", file=sys.stderr)
         return 2
-    Path(args.out).write_text(json.dumps(band, indent=1), encoding="utf-8")
+    try:
+        _write(args.out, json.dumps(band, indent=1))
+    except OSError as e:
+        print(f"faultgate: cannot write output: {e}", file=sys.stderr)
+        return 2
     c = band["clean_rate"]
     print(f"band [{c['min']:.2f}, {c['max']:.2f}] over {band['n']} scenarios × {band['runs']} runs · "
           f"{len(band['clean_in_all_runs'])} clean in every run · written to {args.out}")
@@ -168,13 +184,14 @@ def cmd_baseline(args: argparse.Namespace) -> int:
 
 
 def cmd_precheck(args: argparse.Namespace) -> int:
-    fmt, total, checked, issues = precheck(args.traces, args.format, args.sample)
+    fmt, total, checked, steps, issues = precheck(args.traces, args.format, args.sample)
     for i in issues:
         print(f"{i.level:<8} {i.trace_id:<12}  {i.message}")
     errors = sum(i.level == "error" for i in issues)
     warnings = len(issues) - errors
     verdict = "FAILED" if errors else "OK"
-    print(f"precheck: {verdict} · format {fmt} · checked {checked} of {total} traces · {errors} error(s), {warnings} warning(s)")
+    print(f"precheck: {verdict} · format {fmt} · checked {checked} of {total} traces · {steps} tool steps read · "
+          f"{errors} error(s), {warnings} warning(s)")
     return 2 if errors else 0
 
 
