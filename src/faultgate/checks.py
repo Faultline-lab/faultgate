@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from faultgate.judge import Verdict
-from faultgate.trace import Span, Step, Trace
+from faultgate.trace import Span, Step, Trace, is_tool_span
 
 STEP_CAP_WORDS = ("step cap", "step limit", "max steps", "max_steps", "max iterations", "iteration limit")
 
@@ -120,13 +120,33 @@ class Identity:
 
 
 @dataclass(frozen=True)
+class Predicate:
+    """A typed condition on a dotted path into a parsed JSON tool result: ``op`` is equals, in, not_in or exists."""
+    path: str
+    op: str
+    value: Any
+
+
+@dataclass(frozen=True)
 class Requirement:
     """``tool`` may only run after an earlier call to one of ``after`` (whose result contains ``result_contains``,
-    if set, and whose ``same_arg`` argument equals this call's, if set: the order that was looked up is the order changed)."""
+    if set, and whose ``same_arg`` argument equals this call's, if set: the order that was looked up is the order changed).
+
+    0.4, each off by default: ``success`` (the earlier call must have succeeded), ``result`` (typed predicates on its
+    parsed JSON result), ``latest`` (only the most recent matching call counts) and ``invalidated_by`` (a successful
+    call to one of these tools, on the same ``same_arg`` value, voids every earlier call)."""
     tool: str
     after: tuple[str, ...]
     result_contains: str | None = None
     same_arg: str | None = None
+    success: bool = False
+    result: tuple[Predicate, ...] = ()
+    latest: bool = False
+    invalidated_by: frozenset[str] = frozenset()
+
+    @property
+    def stateful(self) -> bool:
+        return self.success or bool(self.result) or self.latest or bool(self.invalidated_by)
 
 
 @dataclass(frozen=True)
@@ -144,6 +164,22 @@ class AllowedValues:
     tool: str
     arg: str
     allowed: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RequiredArgs:
+    """Every call to ``tool`` must carry each of ``args`` (dotted paths), and not empty."""
+    tool: str
+    args: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Confirmation:
+    """Each call to one of ``tools`` needs an earlier successful ``by`` call (for the same ``same_arg`` value, if set),
+    or the attribute ``faultgate.confirmed = true`` on its own span. Free-text confirmation is not read."""
+    tools: frozenset[str]
+    by: str
+    same_arg: str | None = None
 
 
 def _is_num(v: Any) -> bool:
@@ -175,9 +211,42 @@ def _shape(where: str, d: Any, required: set[str], optional: set[str]) -> dict[s
         elif k == "allowed":
             if not isinstance(d[k], list) or not d[k] or not all(isinstance(x, str) for x in d[k]):
                 raise ValueError(f"policy: {where}.allowed must be a list of strings")
+        elif k in ("success", "latest"):
+            if not isinstance(d[k], bool):
+                raise ValueError(f"policy: {where}.{k} must be true or false")
+        elif k in ("invalidated_by", "args"):
+            if not isinstance(d[k], list) or not d[k] or not all(isinstance(x, str) and x for x in d[k]):
+                raise ValueError(f"policy: {where}.{k} must be a non-empty list of names")
+        elif k == "result":
+            if not isinstance(d[k], list) or not d[k]:
+                raise ValueError(f"policy: {where}.result must be a non-empty list of predicates")
+            for i, pred in enumerate(d[k]):
+                _predicate(f"{where}.result[{i}]", pred)
         elif not isinstance(d[k], str):
             raise ValueError(f"policy: {where}.{k} must be a string")
     return d
+
+
+PREDICATE_OPS = ("equals", "in", "not_in", "exists")
+
+
+def _predicate(where: str, d: Any) -> Predicate:
+    if not isinstance(d, dict):
+        raise ValueError(f"policy: {where} must be an object")
+    if not isinstance(d.get("path"), str) or not d["path"]:
+        raise ValueError(f"policy: {where} needs a 'path' (a dotted path into the JSON result)")
+    unknown = set(d) - {"path", *PREDICATE_OPS}
+    if unknown:
+        raise ValueError(f"policy: {where} has unknown keys {sorted(unknown)}")
+    ops = [k for k in PREDICATE_OPS if k in d]
+    if len(ops) != 1:
+        raise ValueError(f"policy: {where} needs exactly one of {', '.join(PREDICATE_OPS)}")
+    op = ops[0]
+    if op in ("in", "not_in") and not isinstance(d[op], list):
+        raise ValueError(f"policy: {where}.{op} must be a list")
+    if op == "exists" and not isinstance(d[op], bool):
+        raise ValueError(f"policy: {where}.exists must be true or false")
+    return Predicate(d["path"], op, tuple(d[op]) if op in ("in", "not_in") else d[op])
 
 
 def _items(d: dict[str, Any], key: str) -> list[Any]:
@@ -193,8 +262,9 @@ class Policy:
 
     ``allow``/``max_calls``/``max_arg_chars`` are off until you set them (a policy.json);
     ``deny_patterns`` catches path traversal and local-file reads out of the box.
-    ``limits``/``identity``/``requires``/``max_calls_per_arg``/``values`` are business rules on argument values
-    and tool order; each fails closed when it cannot be checked.
+    ``limits``/``identity``/``requires``/``max_calls_per_arg``/``values``/``required_args``/``confirmation`` are
+    business rules on argument values and tool order; each fails closed when it cannot be checked.
+    ``require_complete`` makes an incomplete run (no answer, error termination, no end time) a violation.
     """
     allow: frozenset[str] | None = None
     max_calls: int | None = None
@@ -205,6 +275,9 @@ class Policy:
     requires: tuple[Requirement, ...] = ()
     max_calls_per_arg: tuple[PerValueBudget, ...] = ()
     values: tuple[AllowedValues, ...] = ()
+    required_args: tuple[RequiredArgs, ...] = ()
+    confirmation: Confirmation | None = None
+    require_complete: bool = False
 
     @classmethod
     def load(cls, path: str | Path) -> "Policy":
@@ -213,7 +286,7 @@ class Policy:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Policy":
         unknown = set(d) - {"allow", "max_calls", "max_arg_chars", "deny_patterns", "limits", "identity", "requires",
-                            "max_calls_per_arg", "values"}
+                            "max_calls_per_arg", "values", "required_args", "confirmation", "require_complete"}
         if unknown:
             raise ValueError(f"policy: unknown keys {sorted(unknown)}")
         limits = []
@@ -231,9 +304,12 @@ class Policy:
                                 frozenset(x["tools"]) if "tools" in x else None)
         requires = [
             Requirement(x["tool"], tuple([x["after"]] if isinstance(x["after"], str) else x["after"]),
-                        x.get("result_contains"), x.get("same_arg"))
-            for x in (_shape(f"requires[{i}]", r, {"tool", "after"}, {"result_contains", "same_arg"})
-                      for i, r in enumerate(_items(d, "requires")))
+                        x.get("result_contains"), x.get("same_arg"), x.get("success", False),
+                        tuple(_predicate(f"requires[{i}].result[{j}]", p) for j, p in enumerate(x.get("result", []))),
+                        x.get("latest", False), frozenset(x.get("invalidated_by", [])))
+            for i, x in enumerate(_shape(f"requires[{i}]", r, {"tool", "after"},
+                                         {"result_contains", "same_arg", "success", "result", "latest", "invalidated_by"})
+                                  for i, r in enumerate(_items(d, "requires")))
         ]
         budgets = [
             PerValueBudget(frozenset(x["tools"]), x["arg"], x["max"])
@@ -245,6 +321,17 @@ class Policy:
             for x in (_shape(f"values[{i}]", v, {"tool", "arg", "allowed"}, set())
                       for i, v in enumerate(_items(d, "values")))
         ]
+        required_args = [
+            RequiredArgs(x["tool"], tuple(x["args"]))
+            for x in (_shape(f"required_args[{i}]", v, {"tool", "args"}, set())
+                      for i, v in enumerate(_items(d, "required_args")))
+        ]
+        confirmation = None
+        if "confirmation" in d:
+            x = _shape("confirmation", d["confirmation"], {"tools", "by"}, {"same_arg"})
+            confirmation = Confirmation(frozenset(x["tools"]), x["by"], x.get("same_arg"))
+        if not isinstance(d.get("require_complete", False), bool):
+            raise ValueError("policy: require_complete must be true or false")
         return cls(
             allow=frozenset(d["allow"]) if "allow" in d else None,
             max_calls=d.get("max_calls"),
@@ -255,6 +342,9 @@ class Policy:
             requires=tuple(requires),
             max_calls_per_arg=tuple(budgets),
             values=tuple(values),
+            required_args=tuple(required_args),
+            confirmation=confirmation,
+            require_complete=d.get("require_complete", False),
         )
 
 
@@ -345,6 +435,9 @@ def _business_violations(t: Trace, st: Step, earlier: list[Step], policy: Policy
     for req in policy.requires:
         if st.tool != req.tool:
             continue
+        if req.stateful:
+            bad += _stateful_requirement(t, st, args, earlier, req)
+            continue
         cond = f" returned {req.result_contains!r}" if req.result_contains is not None else ""
         if req.same_arg is None:
             ok = any(e.tool in req.after and (req.result_contains is None or req.result_contains in e.result) for e in earlier)
@@ -358,7 +451,160 @@ def _business_violations(t: Trace, st: Step, earlier: list[Step], policy: Policy
                      and _same(e, req.same_arg, mine) for e in earlier)
         if not ok:
             bad.append(f"step {st.index}: {st.tool} before {' or '.join(req.after)}{cond}")
+    for ra in policy.required_args:
+        if st.tool != ra.tool:
+            continue
+        if args is None:
+            bad.append(f"step {st.index}: {st.tool} arguments are not a JSON object, cannot check required {ra.args[0]}")
+            continue
+        for a in ra.args:
+            if _empty(_dig(args, a)):
+                bad.append(f"step {st.index}: {st.tool} missing required argument {a}")
+    conf = policy.confirmation
+    if conf and st.tool in conf.tools and not _confirmed_on_span(t, st):
+        mine = _ABSENT
+        if conf.same_arg is not None:
+            mine = _dig(args, conf.same_arg) if args is not None else _ABSENT
+            if mine is _ABSENT:
+                bad.append(f"step {st.index}: {st.tool} has no readable {conf.same_arg}, cannot match it to a {conf.by}")
+                return bad
+        if not any(e.tool == conf.by and _succeeded(t, e) and (conf.same_arg is None or _same(e, conf.same_arg, mine))
+                   for e in earlier):
+            scope = f" for the same {conf.same_arg} {str(mine).strip()!r}" if conf.same_arg is not None else ""
+            bad.append(f"step {st.index}: {st.tool} without an earlier successful {conf.by}{scope} "
+                       "(or faultgate.confirmed = true on its span)")
     return bad
+
+
+def _empty(v: Any) -> bool:
+    return v is _ABSENT or v is None or (isinstance(v, (str, list, dict)) and not (v.strip() if isinstance(v, str) else v))
+
+
+def _span_of(t: Trace, st: Step) -> Span | None:
+    return next((s for s in t.spans if s.span_id == st.span_id), None)
+
+
+def _succeeded(t: Trace, st: Step) -> bool:
+    """No structural error in the result, and no error on the call's own tool span."""
+    if _is_structural_error(st.result)[0]:
+        return False
+    span = _span_of(t, st)
+    return not (span is not None and is_tool_span(span) and _span_error(span))
+
+
+def _confirmed_on_span(t: Trace, st: Step) -> bool:
+    span = _span_of(t, st)
+    return span is not None and span.attrs.get("faultgate.confirmed") in (True, "true", "True")
+
+
+_NOT_JSON = object()
+
+
+def _json_result(result: str) -> Any:
+    """The result parsed as JSON (one extra decode for JSON encoded twice), else _NOT_JSON."""
+    try:
+        v = json.loads(result)
+        if isinstance(v, str):
+            v = json.loads(v)
+    except ValueError:
+        return _NOT_JSON
+    return v if isinstance(v, (dict, list)) else _NOT_JSON
+
+
+def _path(v: Any, path: str) -> Any:
+    """Dotted path into parsed JSON; a numeric part indexes a list."""
+    for part in path.split("."):
+        if isinstance(v, dict) and part in v:
+            v = v[part]
+        elif isinstance(v, list) and part.isdigit() and int(part) < len(v):
+            v = v[int(part)]
+        else:
+            return _ABSENT
+    return v
+
+
+def _json_eq(a: Any, b: Any) -> bool:
+    """JSON equality that keeps types apart: true is not 1, "1" is not 1."""
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if _is_num(a) and _is_num(b):
+        return a == b
+    return type(a) is type(b) and a == b
+
+
+def _describe(p: Predicate) -> str:
+    if p.op == "equals":
+        return f"{p.path} == {p.value!r}"
+    if p.op == "exists":
+        return f"{p.path} present" if p.value else f"no {p.path}"
+    return f"{p.path} {'in' if p.op == 'in' else 'not in'} {list(p.value)!r}"
+
+
+def _unmet(t: Trace, e: Step, req: Requirement) -> str | None:
+    """Why the earlier call ``e`` does not satisfy ``req``, or None when it does."""
+    if req.success and not _succeeded(t, e):
+        return "failed"
+    if req.result_contains is not None and req.result_contains not in e.result:
+        return f"result does not contain {req.result_contains!r}"
+    if req.result:
+        doc = _json_result(e.result)
+        if doc is _NOT_JSON:
+            return "result is not JSON"
+        for p in req.result:
+            got = _path(doc, p.path)
+            if p.op == "exists":
+                if (got is not _ABSENT) != p.value:
+                    return f"result has {'no ' if p.value else ''}{p.path}"
+                continue
+            if got is _ABSENT:
+                return f"result has no {p.path}"
+            if p.op == "equals" and not _json_eq(got, p.value):
+                return f"{p.path} is {got!r}, not {p.value!r}"
+            if p.op == "in" and not any(_json_eq(got, x) for x in p.value):
+                return f"{p.path} is {got!r}, not in {list(p.value)!r}"
+            if p.op == "not_in" and any(_json_eq(got, x) for x in p.value):
+                return f"{p.path} is {got!r}"
+    return None
+
+
+def _stateful_requirement(t: Trace, st: Step, args: dict[str, Any] | None, earlier: list[Step],
+                          req: Requirement) -> list[str]:
+    after = " or ".join(req.after)
+    mine: Any = _ABSENT
+    if req.same_arg is not None:
+        mine = _dig(args, req.same_arg) if args is not None else _ABSENT
+        if mine is _ABSENT:
+            return [f"step {st.index}: {st.tool} has no readable {req.same_arg}, cannot match it to {after}"]
+
+    def bound(e: Step) -> bool:
+        return req.same_arg is None or _same(e, req.same_arg, mine)
+
+    cands = [e for e in earlier if e.tool in req.after and bound(e)]
+    voided = None
+    if req.invalidated_by:
+        inv = [e for e in earlier if e.tool in req.invalidated_by and bound(e) and _succeeded(t, e)]
+        if inv:
+            stale = [e for e in cands if e.index < inv[-1].index]
+            cands = [e for e in cands if e.index > inv[-1].index]
+            if stale and not cands:
+                voided = (stale[-1], inv[-1])
+    if req.latest:
+        cands = cands[-1:]
+    if any(_unmet(t, e, req) is None for e in cands):
+        return []
+    cond = (f" before {'a successful ' if req.success else ''}{after}"
+            + (f" returned {req.result_contains!r}" if req.result_contains is not None else "")
+            + (" with " + " and ".join(_describe(p) for p in req.result) if req.result else "")
+            + (f" for the same {req.same_arg} {str(mine).strip()!r}" if req.same_arg is not None else ""))
+    if voided:
+        why = f" ({voided[0].tool} at step {voided[0].index} voided by {voided[1].tool} at step {voided[1].index})"
+    elif cands:
+        e = cands[-1]
+        why = (f" (latest {e.tool} at step {e.index}: {_unmet(t, e, req)})" if req.latest
+               else f" (step {e.index} {e.tool}: {_unmet(t, e, req)})")
+    else:
+        why = ""
+    return [f"step {st.index}: {st.tool}{cond}{why}"]
 
 
 def _same(step: Step, arg: str, value: Any) -> bool:
@@ -388,6 +634,28 @@ def _budget_violations(steps: list[Step], policy: Policy) -> list[str]:
     return bad
 
 
+# terminations that mean the run did not finish: errors, aborts, budgets
+ERROR_TERMINATION = re.compile(r"error|exception|abort|fail|time ?out|timed out|crash|too many|max[_ ]?steps|"
+                               r"step (?:cap|limit)|max iterations|iteration limit", re.I)
+
+
+def _incomplete(t: Trace) -> list[str]:
+    root = t.root
+    if root is None:
+        return ["run incomplete: no root span"]
+    bad = []
+    if not t.answer.strip():
+        bad.append("run incomplete: no final answer")
+    if ERROR_TERMINATION.search(t.termination):
+        bad.append(f"run incomplete: terminated {t.termination!r}")
+    err = _span_error(root)
+    if err:
+        bad.append(f"run incomplete: root span error ({err})")
+    if not root.end_ns:
+        bad.append("run incomplete: root span has no end time")
+    return bad
+
+
 def policy_rule(t: Trace, policy: Policy) -> Verdict:
     """Every violation of the policy across the run's tool calls, by step."""
     steps = t.steps
@@ -404,6 +672,8 @@ def policy_rule(t: Trace, policy: Policy) -> Verdict:
             bad.append(f"step {st.index}: arguments {len(st.arguments)} chars > {policy.max_arg_chars}")
         bad += _business_violations(t, st, steps[:i], policy)
     bad += _budget_violations(steps, policy)
+    if policy.require_complete:
+        bad += _incomplete(t)
     if policy.max_calls is not None and len(steps) > policy.max_calls:
         bad.append(f"{len(steps)} tool calls > max {policy.max_calls}")
     return Verdict(bool(bad), 1.0, "; ".join(bad) if bad else f"{len(steps)} calls within policy")
@@ -668,7 +938,8 @@ CHECKS: dict[str, Check] = {
         Check(
             "policy",
             "A tool call broke the policy: unlisted tool, denied argument pattern, oversized argument, call budget, "
-            "argument limit, identity mismatch, missing prerequisite, per-value budget, or value not allowed.",
+            "argument limit, identity mismatch, missing prerequisite, per-value budget, value not allowed, "
+            "missing required argument, missing confirmation, or (with require_complete) an incomplete run.",
             rule=partial(policy_rule, policy=Policy()),
         ),
         Check(
