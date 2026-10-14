@@ -15,6 +15,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from faultgate.checks import Policy, _json_result, _NOT_JSON
 from faultgate.formats import detect, load
 from faultgate.trace import Trace, is_tool_span
 
@@ -87,8 +88,25 @@ def _trace_issues(t: Trace, fmt: str = "otlp") -> list[Issue]:
     return out
 
 
-def precheck(path: str | Path, fmt: str = "auto", sample: int = DEFAULT_SAMPLE) -> tuple[str, int, int, int, list[Issue]]:
-    """Return (format, traces in file, traces checked, tool steps read in those, issues). ``sample`` <= 0 checks every trace."""
+def describe_policy(path: str | Path) -> tuple[str, bool]:
+    """The keys a policy file uses (requires with its sub-keys), and whether a requirement reads JSON tool results.
+    Raises ValueError on a malformed policy, as check does."""
+    d = json.loads(Path(path).read_text(encoding="utf-8"))
+    pol = Policy.from_dict(d)
+    keys = []
+    for k in sorted(d):
+        if k == "requires" and d[k]:
+            sub = sorted({s for r in d[k] for s in r})
+            keys.append(f"requires ({', '.join(sub)})")
+        else:
+            keys.append(k)
+    return ", ".join(keys) or "(none)", any(r.result or r.latest for r in pol.requires)
+
+
+def precheck(path: str | Path, fmt: str = "auto", sample: int = DEFAULT_SAMPLE,
+             needs_json: bool = False) -> tuple[str, int, int, int, list[Issue]]:
+    """Return (format, traces in file, traces checked, tool steps read in those, issues). ``sample`` <= 0 checks every trace.
+    ``needs_json``: the policy reads tool results as JSON (``result`` / ``latest``); warn when none of them are."""
     p = Path(path)
     try:
         doc = json.loads(p.read_text(encoding="utf-8"))
@@ -102,4 +120,8 @@ def precheck(path: str | Path, fmt: str = "auto", sample: int = DEFAULT_SAMPLE) 
     if not traces:
         return found, 0, 0, 0, [Issue("error", "-", "no traces in file")]
     checked = traces if sample <= 0 else traces[:sample]
-    return found, len(traces), len(checked), sum(len(t.steps) for t in checked), [i for t in checked for i in _trace_issues(t, found)]
+    issues = [i for t in checked for i in _trace_issues(t, found)]
+    if needs_json and not any(_json_result(st.result) is not _NOT_JSON for t in checked for st in t.steps):
+        issues.append(Issue("warning", "-", "the policy's requires use result / latest, but no tool result in the checked "
+                                            "traces is JSON: those prerequisites can never be met"))
+    return found, len(traces), len(checked), sum(len(t.steps) for t in checked), issues
