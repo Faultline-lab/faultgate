@@ -42,10 +42,12 @@ faultgate check traces.json                          # built-in rule checks
 faultgate check traces.json --json report.json       # full per-trace verdicts
 faultgate check traces.json --golden golden.json     # expected answers: correctness + truncation
 faultgate check traces.json --policy policy.json     # what the agent was allowed to do
+faultgate check traces.json --outcomes outcomes.json # your own evaluator's pass / fail per scenario
 faultgate check traces.json --judge laya             # also run judge checks, locally
 faultgate check traces.json --judge litellm:openai/gpt-5.6-luna   # any API model
 faultgate check traces.json --markdown pr.md --audit audit/   # PR comment + audit files
 faultgate precheck traces.json                       # validate an export before gating
+faultgate precheck traces.json --policy policy.json  # ...and check the traces carry what the policy reads
 faultgate checks                                     # list checks and their kind
 faultgate judges                                     # list judge specs
 
@@ -92,6 +94,15 @@ precheck: OK · format langfuse · checked 1 of 1 traces · 2 tool steps read ·
 ```
 
 It reports the detected format and how many tool steps the checks will read, then per trace: duplicate span ids, missing or backwards timestamps, tool calls without a name (errors, exit 2), and missing roots, spans whose parent is not in the export, runs with no prompt, answer or content, tool spans recognised only by their span name, spans that carry tool attributes but are not read as steps, and exports that mix native `execute_tool` spans with OpenInference LLM spans (warnings, exit 0). Compare the tool-step count with what your agent actually ran: a structurally valid export whose tools are not read passes every check by default. It inspects the first 5 traces by default (`--sample N`, `0` for all). On the 30 real benchmark traces from `make demo-real` it passes with warnings: those exports omit the root span.
+
+With `--policy policy.json` it also prints the keys the policy uses and warns when a `requires` rule reads tool results as JSON (`result`, `latest`) but no tool result in the checked traces is JSON, so those prerequisites could never be met:
+
+```
+$ faultgate precheck traces.json --policy examples/policy_retail.json
+policy keys: allow, max_calls_per_arg, required_args, requires (after, invalidated_by, latest, result, same_arg, success, tool), values
+```
+
+A malformed policy exits 2, as it does for `check`.
 
 ## Measured on real agent traces
 
@@ -202,7 +213,56 @@ Order-level rules bind a call to the record it acts on:
 - `max_calls_per_arg`: at most `max` successful calls to `tools` per value of `arg`, e.g. one item change per order. A call whose result is an error is not counted: an agent that fixes a bad item id and retries changed the order once. A call without a readable `arg` is a violation.
 - `values`: the argument, when present, must be one of `allowed` (compared as text, trimmed).
 
-[`examples/policy_retail.json`](examples/policy_retail.json) applies these to the tau2-bench retail domain. On 180 real tau2 retail runs from an outside test (three `gpt-6-luna` baselines, a same-model candidate, a weaker model and a sabotaged prompt) it fires on 0 of the 120 baseline and same-model runs, 5 of 30 weaker-model runs and 1 of 30 sabotaged runs. Still not expressible: confirmation before a change, one tool call per turn, joins against earlier results (payment method on file, item availability, price difference), and anything semantic. A clean `policy` result is not a compliance certificate.
+#### Stateful rules (0.4)
+
+Order and substring are not enough to prove a prerequisite: a failed lookup, an error message that mentions "pending", or a lookup made before the order was cancelled all satisfied a 0.3.1 `requires`. Each key below is opt-in; a policy without them evaluates exactly as in 0.3.1.
+
+**`success`**: the earlier call counts only if it succeeded (no structural error in its result, no error on its tool span).
+
+```json
+{"requires": [{"tool": "cancel_pending_order", "after": ["find_user_id_by_email", "find_user_id_by_name_zip"], "success": true}]}
+```
+
+**`result`**: typed predicates on the earlier call's result, parsed as JSON. Each has a dotted `path` (a number indexes a list: `items.0.status`) and one of `equals`, `in`, `not_in`, `exists`. Comparison keeps JSON types apart (`true` is not `1`). A result that is not JSON, or has no such path, does not meet the condition. `result_contains` keeps its substring meaning.
+
+```json
+{"requires": [{"tool": "cancel_pending_order", "after": "get_order_details", "same_arg": "order_id",
+               "result": [{"path": "status", "equals": "pending"}]}]}
+```
+
+**`latest`** and **`invalidated_by`**: current state. With `latest`, only the most recent matching `after` call (per `same_arg` value) counts: a later lookup that says `cancelled` overrides an earlier `pending`. `invalidated_by` lists tools whose successful call, on the same `same_arg` value, voids every earlier lookup: after a cancel, a modify needs a fresh lookup.
+
+```json
+{"requires": [{"tool": "modify_pending_order_items", "after": "get_order_details", "same_arg": "order_id", "latest": true,
+               "result": [{"path": "status", "equals": "pending"}],
+               "invalidated_by": ["cancel_pending_order", "modify_pending_order_items"]}]}
+```
+
+The reason says which call fell short: `step 6: modify_pending_order_items before get_order_details with status == 'pending' for the same order_id '#W1' (get_order_details at step 2 voided by cancel_pending_order at step 4)`.
+
+**`required_args`**: arguments that must be present and not empty (`""`, `null`, `[]`, `{}`). `values` only checks an argument that is there.
+
+```json
+{"required_args": [{"tool": "cancel_pending_order", "args": ["order_id", "reason"]}]}
+```
+
+**`confirmation`**: each listed mutation needs an earlier successful call to the `by` tool for the same `same_arg` value (optional), or the attribute `faultgate.confirmed = true` on the mutation's own span. Record confirmation as a tool call or a span attribute in your agent. faultgate does not read the conversation to find a "yes": free-text confirmation is out of scope.
+
+```json
+{"confirmation": {"tools": ["cancel_pending_order", "modify_pending_order_items"], "by": "confirm_action", "same_arg": "order_id"}}
+```
+
+**`require_complete`**: an incomplete run is a violation: no final answer, an error termination (`faultgate.termination` naming an error, exception, abort, failure, timeout, crash, `too_many_errors` or a step cap), an error on the root span, or a root span with no end time. A run that stopped half-way cannot prove it followed the rules.
+
+```json
+{"require_complete": true}
+```
+
+[`examples/policy_retail.json`](examples/policy_retail.json) applies these to the tau2-bench retail domain: successful authentication before any account or order change, the latest successful lookup of the same order with the right status, invalidated by status-changing mutations, required arguments, one item change per order and the two allowed cancellation reasons. It has no `confirmation` (tau2 records confirmation only in the dialogue) and no `require_complete` (decide for your recorder). The 0.3.1 version is [`examples/policy_retail_v031.json`](examples/policy_retail_v031.json).
+
+On 180 real tau2 retail runs from an outside test (three `gpt-6-luna` baselines, a same-model candidate, a weaker model and a sabotaged prompt), the 0.4 policy fires on 0 of the 120 baseline and same-model runs, 10 of 30 weaker-model runs and 23 of 30 sabotaged runs; the 0.3.1 policy fires on 0, 5 and 1. The added weaker-model fires include order changes with no identity lookup at all, which the client's hand audit had marked as missed violations.
+
+Still not expressible: free-text confirmation, one tool call per turn, joins against earlier results (the payment method belongs to the customer, the item is available, the price difference is right), and anything semantic. A clean `policy` result is not a compliance certificate.
 
 Reasons name the step and the values: `step 4: modify_billing_record.customer_id 'C-999' != session enduser.id 'C-123'`. [`examples/policy_support.json`](examples/policy_support.json) is a complete customer-support policy. A malformed policy file exits 2.
 
@@ -283,6 +343,27 @@ gate: FAIL · clean rate 0.40 vs band [0.80, 0.87] from 2 baseline runs · fail 
 
 (Qwen returns the head of the answer token without its suffix in 8 of 30 runs. Nobody had noticed.)
 
+## Task outcomes
+
+A clean trace is not a solved task. Retail baselines that faultgate rated structurally clean earned the benchmark reward in 25, 23 and 22 of 30 runs. If you have your own evaluator, hand its verdict in:
+
+```json
+{"retail-0": true, "retail-1": false, "retail-2": true}
+```
+
+```bash
+faultgate check candidate.json --outcomes outcomes.json --band band.json
+faultgate baseline run1.json run2.json run3.json --outcomes outcomes.json --out band.json
+```
+
+Keys are scenario keys (`faultgate.scenario`, `gen_ai.agent.id`, a prompt hash) or the prompt text, as for `--golden`. The `outcome` check fires when a scenario's outcome is `false`. It joins the clean rate like any other check, so a band built with outcomes gates on them. Scenarios missing from the file are not judged, and the output says how many. The terminal, the JSON report (`outcome`) and the Markdown summary keep the two rates apart:
+
+```
+outcome: 23/28 true (0.82) · 2 scenario(s) without an outcome, not judged · structural clean rate 0.93
+```
+
+Without `--outcomes` there is no `outcome` check and the report is exactly as before. Build the band and check the candidate with the same flags: a band built without outcomes warns when the check sets differ.
+
 ## In CI
 
 ```yaml
@@ -300,7 +381,7 @@ Exit 1 on gate FAIL, so the job fails; PASS and INCONCLUSIVE pass (INCONCLUSIVE 
 - uploads an **audit artifact** (`faultgate-audit`): `verdict.json` (verdict, exit code, faultgate version, UTC time, every input file with its SHA-256, gate numbers), `failing_traces.json` (each failing trace and every reason) and `repro.sh`. No prompts, answers or tool payloads are copied into it, and reasons are masked by `redact`;
 - exposes the verdict as the step output `verdict`.
 
-Other inputs: `format`, `redact`, `checks`, `judge`, `report`, `audit`, `version`. `version` takes a version (`0.3.0`), a specifier (`>=0.3`), a full requirement (`faultgate==0.3.0`) or any pip spec (a path, `git+https://...`); the default is the latest release. The same files come from the CLI with `--markdown summary.md --audit audit/`. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes, with matching verdict outputs and audit files.
+Other inputs: `format`, `redact`, `checks`, `judge`, `report`, `audit`, `outcomes`, `version`. `version` takes a version (`0.3.0`), a specifier (`>=0.3`), a full requirement (`faultgate==0.3.0`) or any pip spec (a path, `git+https://...`); the default is the latest release. The same files come from the CLI with `--markdown summary.md --audit audit/`. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes, with matching verdict outputs and audit files.
 
 ## How much to trust a verdict
 
@@ -310,7 +391,7 @@ This is the part every evaluation tool skips. Every check and judge here is scor
 |---|---|---|---|---|---|---|
 | `search_loop` | rule | 36 | 1.00 | 0.99 | **0.98** | **1.00** |
 | `abstention` | rule | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
-| `policy` | rule | synthetic | 4/4 P9 categories | 0 FP on 290 real traces | — | — |
+| `policy` | rule | synthetic | 4/4 P9 categories; 6/6 retail gap fixtures | 0 FP on 290 real traces; 0 of 7 valid retail look-alikes; 0 of 120 retail baseline / same-model runs | — | — |
 | `context_overflow` | rule | synthetic | finish-reason and provider-error forms in `tests/test_checks.py` | 0 FP on the 125 shipped real traces | — | — |
 | `wrong_answer` | golden | 4 | 1.00 | 1.00 | 1.00 | 1.00 |
 | `truncation` | golden | 1 | 1.00 | 1.00 | 1.00 | — (0 positives) |
@@ -323,6 +404,7 @@ Read the table honestly:
 - `abstention` and `truncation` have one positive each to learn from. `abstention` is a phrase list; a paraphrase it doesn't know is a miss. It was tuned on question-answering runs and then narrowed after an outside test on tau2 retail support runs, where "cannot" and "unable to" fired on 21 of 180 final answers that were policy reminders, authentication refusals and explanations of what a tool cannot do. It now fires on 1 of those 180 ("couldn't locate the ... payment method"); the P4 numbers above are unchanged.
 - `wrong_answer` agrees with the human verdict on all 21 answered runs. It is substring containment, case-insensitive: right for short factual answers, wrong for free-text ones — say what "expected" means for your task before you trust it.
 - `policy` has no human-labelled positives: FAULTLINE's agent rejects hostile calls before they become steps, so its traces never contain an executed attack. Recall is by construction on the P9 attack shapes; the number that matters is zero false positives on real runs.
+- The 0.4 policy keys were built against six gaps an outside client found in 0.3.1 (a failed prerequisite, an error message matching a substring, stale state, an incidental substring, a missing argument, no confirmation). [`tests/fixtures/retail_gaps.json`](tests/fixtures/retail_gaps.json) holds one run per gap and 7 valid look-alikes: 6 of 6 gaps fire with the 0.4 keys and 0 of 6 with the 0.3.1 policy; 0 of 7 look-alikes fire. These are hand-written fixtures by the maintainer, not an independent test set: they show each key works, not how often real agents commit each gap.
 - `wrong_direction` is the only check that needs reading, and the only local judge we have is noise on it (fires on 39% of clean runs). It ships because the contract is the product: the day a local model scores κ ≥ 0.7 on it, that's a one-line adapter, and this harness is what proves it.
 - Laya's context is 512 tokens. `faultgate` compacts the trace to fit (answer and termination first, middle steps elided) and counts every call that still overflows; the count is printed.
 
@@ -344,6 +426,8 @@ class Judge(Protocol):
 - **Premature stop** (answered with an intermediate entity of the chain). Needs the traversal chain, not just the final answer.
 - **Semantic injection checks** (the agent obeyed text it read). P9 has the taxonomy; needs a judge that scores.
 - **Running your agent.** `faultgate` reads traces; it never executes anything.
+- **Free-text confirmation.** `confirmation` needs a confirm tool call or a span attribute; faultgate does not read the dialogue.
+- **Relational policy checks.** Ownership (the order or payment method belongs to this customer), item availability and price arithmetic need joins against earlier results; `policy` has no keys for them yet.
 
 ## Built on FAULTLINE
 

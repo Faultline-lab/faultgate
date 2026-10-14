@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0 — 2026-10-14
+
+Closes the six policy gaps an outside client found in 0.3.1 (17 retail probes: 6 caught, 6 missed) and adds an outcome input.
+
+- `requires[].success`: the earlier call counts only if it succeeded (no structural error, no tool span error). Gap: a failed identity lookup followed by a mutation.
+- `requires[].result`: typed predicates (`equals`, `in`, `not_in`, `exists`) on a dotted path into the earlier call's parsed JSON result; a non-JSON result or a missing path fails closed. Gaps: an error message containing "pending"; a delivered order whose note says "previously pending". `result_contains` is unchanged.
+- `requires[].latest` and `requires[].invalidated_by`: only the most recent matching lookup counts (per `same_arg` value), and a successful call to a listed tool on the same record voids earlier lookups. Gap: lookup "pending", cancel, then modify on the stale lookup.
+- `required_args`: listed arguments must be present and not empty. Gap: a cancellation without a reason.
+- `confirmation`: listed mutations need an earlier successful confirm-tool call for the same record, or `faultgate.confirmed = true` on the mutation span. Gap: a mutation without confirmation.
+- `require_complete`: no final answer, an error termination, a root span error or a root span with no end time is a policy violation.
+- `--outcomes outcomes.json` on `check` and `baseline`, and an `outcomes` Action input: `{scenario key: true | false}` from your own evaluator. The `outcome` check fires on `false`, joins the clean rate (bands and gates unchanged), skips scenarios without an outcome and reports how many. Terminal, JSON (`outcome`) and Markdown show outcome rate and structural clean rate separately.
+- `precheck --policy`: lists the policy's keys and warns when `result` / `latest` rules meet traces with no JSON tool results.
+- `examples/policy_retail.json` uses the new keys; the 0.3.1 file is `examples/policy_retail_v031.json`. On 180 real tau2 retail runs: 0 fires on 120 baseline and same-model runs (unchanged), 10/30 weaker-model runs (was 5), 23/30 sabotaged runs (was 1).
+- `tests/fixtures/retail_gaps.json`: one run per gap and 7 valid look-alikes; all 6 gaps fire with the new keys and none with the 0.3.1 policy; no look-alike fires.
+
+**Back-compat.** Every new key and flag is opt-in. A policy, band or command line from 0.3.1 gives the same result: on the shipped examples, the `make demo-real` sample and the format examples, with no policy and with each shipped 0.3.1 policy, the JSON reports of 0.3.1 and 0.4.0 are byte-identical (40 runs), and the examples/gate verdicts are unchanged. Without `--outcomes`, reports have no `outcome` check.
+
+**Not covered.** Free-text confirmation (faultgate does not read the dialogue); relational checks such as payment-method or order ownership, item availability and price arithmetic; one tool call per turn. Run-ending root errors are caught by `require_complete`, not by `unrecovered_tool_error`.
+
 ## 0.3.1 — 2026-10-13
 
 Fixes from the first outside test (tau2-bench retail, 180 real runs, 2026-10-13).
