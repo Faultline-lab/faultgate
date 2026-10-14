@@ -32,11 +32,11 @@ class Check:
     description: str
     question: str | None = None            # asked of the judge
     rule: Callable[[Trace], Verdict] | None = None  # or decided by code
-    needs: str | None = None               # "golden": only runs when --golden is given
+    needs: str | None = None               # "golden" / "outcome": only runs when --golden / --outcomes is given
 
     @property
     def kind(self) -> str:
-        return "judge" if self.question else ("golden" if self.needs == "golden" else "rule")
+        return "judge" if self.question else (self.needs or "rule")
 
 
 def _empty_result(result: str) -> bool:
@@ -981,20 +981,58 @@ CHECKS: dict[str, Check] = {
 GOLDEN_RULES = {"wrong_answer": wrong_answer_rule, "truncation": truncation_rule}
 
 
-def select(names: str | None, policy: Policy | None = None, golden: Golden | None = None) -> list[Check]:
-    """Resolve check names; bind a policy / golden file to the checks that take one.
+class Outcomes(dict):
+    """Task outcomes from the user's own evaluator (e.g. tau2 reward == 1), keyed like golden answers:
+    scenario key (faultgate.scenario / gen_ai.agent.id / prompt hash) or the prompt text itself."""
 
-    A golden check with no golden file keeps ``rule=None`` and is skipped by the runner.
+    @classmethod
+    def load(cls, path: str | Path) -> "Outcomes":
+        try:
+            d = json.loads(Path(path).read_text(encoding="utf-8"))
+        except ValueError as e:
+            raise ValueError(f"outcomes: {path} is not JSON ({e})") from e
+        if not isinstance(d, dict) or not all(isinstance(v, bool) for v in d.values()):
+            raise ValueError("outcomes: expected a JSON object of {scenario key or prompt: true | false}")
+        return cls(d)
+
+    def outcome(self, t: Trace) -> bool | None:
+        for k in (t.key, t.prompt):
+            if k in self:
+                return self[k]
+        return None
+
+
+def outcome_rule(t: Trace, outcomes: Outcomes) -> Verdict:
+    """Fires when the user's evaluator marked the scenario failed. Scenarios without an outcome are not judged."""
+    ok = outcomes.outcome(t)
+    if ok is None:
+        return Verdict(False, 0.0, "no outcome for this scenario")
+    return Verdict(not ok, 1.0, "outcome true in the outcomes file" if ok else "outcome false in the outcomes file")
+
+
+# not in CHECKS: it exists only when an outcomes file is given, so default reports keep their 0.3.1 check set
+OUTCOME = Check("outcome", "The user's own evaluator marked the scenario failed (needs --outcomes).", rule=None, needs="outcome")
+
+
+def select(names: str | None, policy: Policy | None = None, golden: Golden | None = None,
+           outcomes: Outcomes | None = None) -> list[Check]:
+    """Resolve check names; bind a policy / golden / outcomes file to the checks that take one.
+
+    A golden check with no golden file keeps ``rule=None`` and is skipped by the runner. ``outcome`` joins the
+    default set only when an outcomes file is given.
     """
-    wanted = [n.strip() for n in names.split(",")] if names else list(CHECKS)
+    available = {**CHECKS, OUTCOME.name: OUTCOME}
+    wanted = [n.strip() for n in names.split(",")] if names else list(CHECKS) + ([OUTCOME.name] if outcomes is not None else [])
     out = []
     for n in wanted:
-        if n not in CHECKS:
-            raise ValueError(f"unknown check {n!r}; available: {', '.join(CHECKS)}")
-        c = CHECKS[n]
+        if n not in available:
+            raise ValueError(f"unknown check {n!r}; available: {', '.join(available)}")
+        c = available[n]
         if n == "policy" and policy is not None:
             c = Check(c.name, c.description, rule=partial(policy_rule, policy=policy))
         if n in GOLDEN_RULES and golden is not None:
             c = Check(c.name, c.description, rule=partial(GOLDEN_RULES[n], golden=golden), needs="golden")
+        if n == OUTCOME.name and outcomes is not None:
+            c = Check(c.name, c.description, rule=partial(outcome_rule, outcomes=outcomes), needs="outcome")
         out.append(c)
     return out

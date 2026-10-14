@@ -6,6 +6,7 @@ inputs:
   band:    { description: "band.json from `faultgate baseline` (FAIL only outside the measured band)", required: false, default: "" }
   golden:  { description: "golden.json of expected answers", required: false, default: "" }
   policy:  { description: "policy.json of allowed tools / patterns / budgets / limits / identity / prerequisites", required: false, default: "" }
+  outcomes: { description: "outcomes.json of {scenario key: true | false} from your own evaluator (adds the outcome check)", required: false, default: "" }
   checks:  { description: "comma-separated subset of checks", required: false, default: "" }
   judge:   { description: "laya or litellm:<model>; needs the [laya] / [api] extra installed", required: false, default: "" }
   format:  { description: "trace format (default: detect)", required: false, default: "auto" }
@@ -45,6 +46,7 @@ runs:
         BAND: ${{ inputs.band }}
         GOLDEN: ${{ inputs.golden }}
         POLICY: ${{ inputs.policy }}
+        OUTCOMES: ${{ inputs.outcomes }}
         CHECKS: ${{ inputs.checks }}
         JUDGE: ${{ inputs.judge }}
       run: |
@@ -54,6 +56,7 @@ runs:
         [ -n "$BAND" ]   && args+=(--band "$BAND")
         [ -n "$GOLDEN" ] && args+=(--golden "$GOLDEN")
         [ -n "$POLICY" ] && args+=(--policy "$POLICY")
+        [ -n "$OUTCOMES" ] && args+=(--outcomes "$OUTCOMES")
         [ -n "$CHECKS" ] && args+=(--check "$CHECKS")
         [ -n "$JUDGE" ]  && args+=(--judge "$JUDGE")
         set +e

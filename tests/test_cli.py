@@ -88,3 +88,80 @@ def test_unwritable_output_exits_2_not_1(tmp_path, capsys):
     assert cli.main(["check", str(EXAMPLES), "--check", "repeated_call", "--json", str(blocker / "report.json")]) == 2
     captured = capsys.readouterr()
     assert "0/5 traces failed" in captured.out and "cannot write output" in captured.err
+
+
+# --- 0.4: --outcomes and precheck --policy ---
+
+GATE = EXAMPLES.parent / "gate"
+
+
+def _outcomes(tmp_path, path, false_every=4, drop=0):
+    from faultgate.trace import load_otlp
+
+    keys = [t.key for t in load_otlp(path)]
+    keys = keys[: len(keys) - drop]
+    p = tmp_path / f"outcomes-{path.stem}.json"
+    p.write_text(json.dumps({k: i % false_every != 0 for i, k in enumerate(keys)}))
+    return p
+
+
+def test_check_with_outcomes_reports_both_rates(tmp_path, capsys):
+    oc = _outcomes(tmp_path, EXAMPLES, false_every=5, drop=1)  # 4 judged (1 false), 1 without an outcome
+    out, md = tmp_path / "r.json", tmp_path / "pr.md"
+    assert cli.main(["check", str(EXAMPLES), "--outcomes", str(oc), "--json", str(out), "--markdown", str(md)]) == 1
+    text = capsys.readouterr().out
+    assert "outcome: 3/4 true (0.75) · 1 scenario(s) without an outcome, not judged · structural clean rate 0.60" in text
+    rep = json.loads(out.read_text())
+    assert rep["checks"][-1] == "outcome" and rep["fired"]["outcome"] == 1
+    assert rep["outcome"] == {"judged": 4, "missing": 1, "true": 3, "outcome_rate": 0.75, "structural_clean_rate": 0.6,
+                              "clean_rate": 0.6}
+    assert "**Outcome:** 3/4 true (0.75) · 1 without an outcome · structural clean rate 0.60" in md.read_text(encoding="utf-8")
+
+
+def test_without_outcomes_the_report_is_unchanged(tmp_path):
+    out = tmp_path / "r.json"
+    cli.main(["check", str(EXAMPLES), "--json", str(out)])
+    rep = json.loads(out.read_text())
+    assert "outcome" not in rep and "outcome" not in rep["checks"]
+
+
+def test_outcomes_join_the_band_and_gate(tmp_path, capsys):
+    runs = [GATE / "baseline_glm_run1.json", GATE / "baseline_glm_run2.json"]
+    band = tmp_path / "band.json"
+    args = ["baseline", *map(str, runs), "--outcomes", str(_outcomes(tmp_path, runs[0], false_every=100)), "--out", str(band)]
+    assert cli.main(args) == 0
+    assert json.loads(band.read_text())["checks"][-1] == "outcome"
+    # the same run, now with most outcomes false: structurally identical, outcome-wise a regression
+    bad = _outcomes(tmp_path, runs[1], false_every=2)
+    assert cli.main(["check", str(runs[1]), "--outcomes", str(bad), "--band", str(band)]) == 1
+    assert "gate: FAIL" in capsys.readouterr().out
+
+
+def test_malformed_outcomes_exit_2(tmp_path, capsys):
+    p = tmp_path / "o.json"
+    p.write_text('{"a": "yes"}')
+    assert cli.main(["check", str(EXAMPLES), "--outcomes", str(p)]) == 2
+    assert "outcomes" in capsys.readouterr().err
+
+
+def test_precheck_reports_policy_keys_and_missing_json_results(tmp_path, capsys):
+    pol = tmp_path / "p.json"
+    pol.write_text(json.dumps({"allow": ["search"], "require_complete": True,
+                               "requires": [{"tool": "lookup", "after": "search", "latest": True,
+                                             "result": [{"path": "status", "equals": "ok"}]}]}))
+    assert cli.main(["precheck", str(EXAMPLES), "--policy", str(pol)]) == 0
+    out = capsys.readouterr().out
+    assert "policy keys: allow, require_complete, requires (after, latest, result, tool)" in out
+    assert "no tool result in the checked traces is JSON" not in out  # the examples carry JSON results
+    # traces whose tool results are plain text cannot satisfy a result predicate
+    doc = json.loads(EXAMPLES.read_text(encoding="utf-8"))
+    for s in doc["resourceSpans"][0]["scopeSpans"][0]["spans"]:
+        for a in s["attributes"]:
+            if a["key"] == "gen_ai.tool.call.result":
+                a["value"] = {"stringValue": "plain text"}
+    plain = tmp_path / "plain.json"
+    plain.write_text(json.dumps(doc))
+    assert cli.main(["precheck", str(plain), "--policy", str(pol)]) == 0
+    assert "no tool result in the checked traces is JSON" in capsys.readouterr().out
+    pol.write_text('{"requires": [{"tool": "x"}]}')
+    assert cli.main(["precheck", str(EXAMPLES), "--policy", str(pol)]) == 2
