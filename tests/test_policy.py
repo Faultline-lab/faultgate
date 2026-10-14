@@ -556,3 +556,52 @@ def test_04_keys_are_off_by_default():
         pol = Policy.load(EXAMPLES.parent / f)
         assert not pol.required_args and pol.confirmation is None and pol.require_complete is False
         assert all(not r.success and not r.result and not r.latest and not r.invalidated_by for r in pol.requires)
+
+
+# --- 0.4: the six 0.3.1 gaps as a retail fixture (tests/fixtures/retail_gaps.json, make_retail_gaps.py) ---
+
+GAPS = EXAMPLES.parents[1] / "tests" / "fixtures" / "retail_gaps.json"
+MUTATIONS = ["cancel_pending_order", "modify_pending_order_address", "modify_pending_order_items",
+             "modify_pending_order_payment", "return_delivered_order_items", "exchange_delivered_order_items"]
+
+
+def _gap_policy() -> Policy:
+    """examples/policy_retail.json plus structured confirmation (tau2 has no confirm tool; the fixture does)."""
+    d = json.loads(RETAIL.read_text(encoding="utf-8"))
+    d["allow"] = [*d["allow"], "confirm_action"]
+    d["confirmation"] = {"tools": MUTATIONS, "by": "confirm_action", "same_arg": "order_id"}
+    d["require_complete"] = True
+    return Policy.from_dict(d)
+
+
+@pytest.mark.parametrize("scenario, expected", [
+    ("gap-G1-failed-auth", "cancel_pending_order before a successful find_user_id_by_email or find_user_id_by_name_zip "
+                           "(step 1 find_user_id_by_email: failed)"),
+    ("gap-G2-error-text", "(latest get_order_details at step 2: failed)"),
+    ("gap-G3-stale-state", "(get_order_details at step 2 voided by cancel_pending_order at step 4)"),
+    ("gap-G4-incidental-substring", "(latest get_order_details at step 2: status is 'delivered', not 'pending')"),
+    ("gap-G5-missing-reason", "cancel_pending_order missing required argument reason"),
+    ("gap-G6-no-confirmation", "cancel_pending_order without an earlier successful confirm_action for the same order_id '#W1'"),
+])
+def test_each_031_gap_fires_with_the_04_policy_and_not_with_031(scenario, expected):
+    (t,) = [t for t in load_otlp(GAPS) if t.key == scenario]
+    v = policy_rule(t, _gap_policy())
+    assert v.detected and expected in v.reason, v.reason
+    old = Policy.load(EXAMPLES.parent / "policy_retail_v031.json")
+    assert not policy_rule(t, dataclasses.replace(old, allow=None)).detected  # the 0.3.1 policy misses it
+
+
+def test_valid_look_alikes_stay_clean():
+    ok = [t for t in load_otlp(GAPS) if t.key.startswith("ok-")]
+    assert len(ok) >= 5
+    pol = _gap_policy()
+    assert {t.key: policy_rule(t, pol).reason for t in ok if policy_rule(t, pol).detected} == {}
+
+
+def test_gap_fixture_is_generated_from_its_script():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("make_retail_gaps", GAPS.with_name("make_retail_gaps.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert json.loads(GAPS.read_text(encoding="utf-8")) == mod.build()

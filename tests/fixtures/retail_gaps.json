@@ -1,0 +1,2671 @@
+{
+ "resourceSpans": [
+  {
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "00000000000003e8",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760000000000000000",
+       "endTimeUnixNano": "1760000010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "gap-G1-failed-auth"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request gap-G1-failed-auth"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "00000000000003e9",
+       "parentSpanId": "00000000000003e8",
+       "name": "execute_tool find_user_id_by_email",
+       "startTimeUnixNano": "1760000000100000000",
+       "endTimeUnixNano": "1760000000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_email"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"email\": \"yusuf@example.com\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "Error: User not found"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "00000000000003ea",
+       "parentSpanId": "00000000000003e8",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760000000200000000",
+       "endTimeUnixNano": "1760000000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "00000000000003eb",
+       "parentSpanId": "00000000000003e8",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760000000300000000",
+       "endTimeUnixNano": "1760000000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "00000000000003ec",
+       "parentSpanId": "00000000000003e8",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760000000400000000",
+       "endTimeUnixNano": "1760000000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000002",
+       "spanId": "00000000000007d0",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760001000000000000",
+       "endTimeUnixNano": "1760001010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "gap-G2-error-text"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request gap-G2-error-text"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000002",
+       "spanId": "00000000000007d1",
+       "parentSpanId": "00000000000007d0",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760001000100000000",
+       "endTimeUnixNano": "1760001000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000002",
+       "spanId": "00000000000007d2",
+       "parentSpanId": "00000000000007d0",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760001000200000000",
+       "endTimeUnixNano": "1760001000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "Error: order #W1 is not pending"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000002",
+       "spanId": "00000000000007d3",
+       "parentSpanId": "00000000000007d0",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760001000300000000",
+       "endTimeUnixNano": "1760001000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000002",
+       "spanId": "00000000000007d4",
+       "parentSpanId": "00000000000007d0",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760001000400000000",
+       "endTimeUnixNano": "1760001000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000003",
+       "spanId": "0000000000000bb8",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760002000000000000",
+       "endTimeUnixNano": "1760002010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "gap-G3-stale-state"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request gap-G3-stale-state"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000003",
+       "spanId": "0000000000000bb9",
+       "parentSpanId": "0000000000000bb8",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760002000100000000",
+       "endTimeUnixNano": "1760002000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000003",
+       "spanId": "0000000000000bba",
+       "parentSpanId": "0000000000000bb8",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760002000200000000",
+       "endTimeUnixNano": "1760002000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000003",
+       "spanId": "0000000000000bbb",
+       "parentSpanId": "0000000000000bb8",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760002000300000000",
+       "endTimeUnixNano": "1760002000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000003",
+       "spanId": "0000000000000bbc",
+       "parentSpanId": "0000000000000bb8",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760002000400000000",
+       "endTimeUnixNano": "1760002000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000003",
+       "spanId": "0000000000000bbd",
+       "parentSpanId": "0000000000000bb8",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760002000500000000",
+       "endTimeUnixNano": "1760002000510000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000003",
+       "spanId": "0000000000000bbe",
+       "parentSpanId": "0000000000000bb8",
+       "name": "execute_tool modify_pending_order_items",
+       "startTimeUnixNano": "1760002000600000000",
+       "endTimeUnixNano": "1760002000610000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "modify_pending_order_items"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"item_ids\": [\"1008292230\"], \"new_item_ids\": [\"1199058591\"], \"payment_method_id\": \"credit_card_9513926\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending (item modified)\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000004",
+       "spanId": "0000000000000fa0",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760003000000000000",
+       "endTimeUnixNano": "1760003010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "gap-G4-incidental-substring"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request gap-G4-incidental-substring"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000004",
+       "spanId": "0000000000000fa1",
+       "parentSpanId": "0000000000000fa0",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760003000100000000",
+       "endTimeUnixNano": "1760003000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000004",
+       "spanId": "0000000000000fa2",
+       "parentSpanId": "0000000000000fa0",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760003000200000000",
+       "endTimeUnixNano": "1760003000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"delivered\", \"note\": \"previously pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000004",
+       "spanId": "0000000000000fa3",
+       "parentSpanId": "0000000000000fa0",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760003000300000000",
+       "endTimeUnixNano": "1760003000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000004",
+       "spanId": "0000000000000fa4",
+       "parentSpanId": "0000000000000fa0",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760003000400000000",
+       "endTimeUnixNano": "1760003000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000005",
+       "spanId": "0000000000001388",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760004000000000000",
+       "endTimeUnixNano": "1760004010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "gap-G5-missing-reason"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request gap-G5-missing-reason"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000005",
+       "spanId": "0000000000001389",
+       "parentSpanId": "0000000000001388",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760004000100000000",
+       "endTimeUnixNano": "1760004000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000005",
+       "spanId": "000000000000138a",
+       "parentSpanId": "0000000000001388",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760004000200000000",
+       "endTimeUnixNano": "1760004000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000005",
+       "spanId": "000000000000138b",
+       "parentSpanId": "0000000000001388",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760004000300000000",
+       "endTimeUnixNano": "1760004000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000005",
+       "spanId": "000000000000138c",
+       "parentSpanId": "0000000000001388",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760004000400000000",
+       "endTimeUnixNano": "1760004000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000006",
+       "spanId": "0000000000001770",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760005000000000000",
+       "endTimeUnixNano": "1760005010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "gap-G6-no-confirmation"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request gap-G6-no-confirmation"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000006",
+       "spanId": "0000000000001771",
+       "parentSpanId": "0000000000001770",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760005000100000000",
+       "endTimeUnixNano": "1760005000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000006",
+       "spanId": "0000000000001772",
+       "parentSpanId": "0000000000001770",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760005000200000000",
+       "endTimeUnixNano": "1760005000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000006",
+       "spanId": "0000000000001773",
+       "parentSpanId": "0000000000001770",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760005000300000000",
+       "endTimeUnixNano": "1760005000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000007",
+       "spanId": "0000000000001b58",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760006000000000000",
+       "endTimeUnixNano": "1760006010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "ok-email-auth"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request ok-email-auth"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000007",
+       "spanId": "0000000000001b59",
+       "parentSpanId": "0000000000001b58",
+       "name": "execute_tool find_user_id_by_email",
+       "startTimeUnixNano": "1760006000100000000",
+       "endTimeUnixNano": "1760006000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_email"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"email\": \"yusuf@example.com\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000007",
+       "spanId": "0000000000001b5a",
+       "parentSpanId": "0000000000001b58",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760006000200000000",
+       "endTimeUnixNano": "1760006000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000007",
+       "spanId": "0000000000001b5b",
+       "parentSpanId": "0000000000001b58",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760006000300000000",
+       "endTimeUnixNano": "1760006000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000007",
+       "spanId": "0000000000001b5c",
+       "parentSpanId": "0000000000001b58",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760006000400000000",
+       "endTimeUnixNano": "1760006000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000008",
+       "spanId": "0000000000001f40",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760007000000000000",
+       "endTimeUnixNano": "1760007010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "ok-name-zip-auth"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request ok-name-zip-auth"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000008",
+       "spanId": "0000000000001f41",
+       "parentSpanId": "0000000000001f40",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760007000100000000",
+       "endTimeUnixNano": "1760007000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000008",
+       "spanId": "0000000000001f42",
+       "parentSpanId": "0000000000001f40",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760007000200000000",
+       "endTimeUnixNano": "1760007000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000008",
+       "spanId": "0000000000001f43",
+       "parentSpanId": "0000000000001f40",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760007000300000000",
+       "endTimeUnixNano": "1760007000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000008",
+       "spanId": "0000000000001f44",
+       "parentSpanId": "0000000000001f40",
+       "name": "execute_tool modify_pending_order_items",
+       "startTimeUnixNano": "1760007000400000000",
+       "endTimeUnixNano": "1760007000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "modify_pending_order_items"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"item_ids\": [\"1008292230\"], \"new_item_ids\": [\"1199058591\"], \"payment_method_id\": \"credit_card_9513926\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending (item modified)\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000009",
+       "spanId": "0000000000002328",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760008000000000000",
+       "endTimeUnixNano": "1760008010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "ok-failed-call-retry"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request ok-failed-call-retry"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000009",
+       "spanId": "0000000000002329",
+       "parentSpanId": "0000000000002328",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760008000100000000",
+       "endTimeUnixNano": "1760008000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000009",
+       "spanId": "000000000000232a",
+       "parentSpanId": "0000000000002328",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760008000200000000",
+       "endTimeUnixNano": "1760008000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000009",
+       "spanId": "000000000000232b",
+       "parentSpanId": "0000000000002328",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760008000300000000",
+       "endTimeUnixNano": "1760008000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000009",
+       "spanId": "000000000000232c",
+       "parentSpanId": "0000000000002328",
+       "name": "execute_tool modify_pending_order_items",
+       "startTimeUnixNano": "1760008000400000000",
+       "endTimeUnixNano": "1760008000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "modify_pending_order_items"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"item_ids\": [\"1008292230\"], \"new_item_ids\": [\"9999\"], \"payment_method_id\": \"credit_card_9513926\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "Error: Item not found"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "00000000000000000000000000000009",
+       "spanId": "000000000000232d",
+       "parentSpanId": "0000000000002328",
+       "name": "execute_tool modify_pending_order_items",
+       "startTimeUnixNano": "1760008000500000000",
+       "endTimeUnixNano": "1760008000510000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "modify_pending_order_items"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"item_ids\": [\"1008292230\"], \"new_item_ids\": [\"1199058591\"], \"payment_method_id\": \"credit_card_9513926\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending (item modified)\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000a",
+       "spanId": "0000000000002710",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760009000000000000",
+       "endTimeUnixNano": "1760009010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "ok-different-orders"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request ok-different-orders"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000a",
+       "spanId": "0000000000002711",
+       "parentSpanId": "0000000000002710",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760009000100000000",
+       "endTimeUnixNano": "1760009000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000a",
+       "spanId": "0000000000002712",
+       "parentSpanId": "0000000000002710",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760009000200000000",
+       "endTimeUnixNano": "1760009000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000a",
+       "spanId": "0000000000002713",
+       "parentSpanId": "0000000000002710",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760009000300000000",
+       "endTimeUnixNano": "1760009000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W3\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W3\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000a",
+       "spanId": "0000000000002714",
+       "parentSpanId": "0000000000002710",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760009000400000000",
+       "endTimeUnixNano": "1760009000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000a",
+       "spanId": "0000000000002715",
+       "parentSpanId": "0000000000002710",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760009000500000000",
+       "endTimeUnixNano": "1760009000510000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000a",
+       "spanId": "0000000000002716",
+       "parentSpanId": "0000000000002710",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760009000600000000",
+       "endTimeUnixNano": "1760009000610000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W3\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000a",
+       "spanId": "0000000000002717",
+       "parentSpanId": "0000000000002710",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760009000700000000",
+       "endTimeUnixNano": "1760009000710000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W3\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W3\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000b",
+       "spanId": "0000000000002af8",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760010000000000000",
+       "endTimeUnixNano": "1760010010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "ok-single-exchange"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request ok-single-exchange"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000b",
+       "spanId": "0000000000002af9",
+       "parentSpanId": "0000000000002af8",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760010000100000000",
+       "endTimeUnixNano": "1760010000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000b",
+       "spanId": "0000000000002afa",
+       "parentSpanId": "0000000000002af8",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760010000200000000",
+       "endTimeUnixNano": "1760010000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W2\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W2\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"delivered\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000b",
+       "spanId": "0000000000002afb",
+       "parentSpanId": "0000000000002af8",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760010000300000000",
+       "endTimeUnixNano": "1760010000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W2\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000b",
+       "spanId": "0000000000002afc",
+       "parentSpanId": "0000000000002af8",
+       "name": "execute_tool exchange_delivered_order_items",
+       "startTimeUnixNano": "1760010000400000000",
+       "endTimeUnixNano": "1760010000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "exchange_delivered_order_items"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W2\", \"item_ids\": [\"5996159312\"], \"new_item_ids\": [\"8555936349\"], \"payment_method_id\": \"paypal_3024827\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W2\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"exchange requested\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000c",
+       "spanId": "0000000000002ee0",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760011000000000000",
+       "endTimeUnixNano": "1760011010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "ok-failed-auth-then-retry"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request ok-failed-auth-then-retry"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000c",
+       "spanId": "0000000000002ee1",
+       "parentSpanId": "0000000000002ee0",
+       "name": "execute_tool find_user_id_by_email",
+       "startTimeUnixNano": "1760011000100000000",
+       "endTimeUnixNano": "1760011000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_email"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"email\": \"y@example.com\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "Error: User not found"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000c",
+       "spanId": "0000000000002ee2",
+       "parentSpanId": "0000000000002ee0",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760011000200000000",
+       "endTimeUnixNano": "1760011000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000c",
+       "spanId": "0000000000002ee3",
+       "parentSpanId": "0000000000002ee0",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760011000300000000",
+       "endTimeUnixNano": "1760011000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000c",
+       "spanId": "0000000000002ee4",
+       "parentSpanId": "0000000000002ee0",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760011000400000000",
+       "endTimeUnixNano": "1760011000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000c",
+       "spanId": "0000000000002ee5",
+       "parentSpanId": "0000000000002ee0",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760011000500000000",
+       "endTimeUnixNano": "1760011000510000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000d",
+       "spanId": "00000000000032c8",
+       "name": "invoke_agent",
+       "startTimeUnixNano": "1760012000000000000",
+       "endTimeUnixNano": "1760012010000000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "retail"
+         }
+        },
+        {
+         "key": "faultgate.scenario",
+         "value": {
+          "stringValue": "ok-relookup-after-mutation"
+         }
+        },
+        {
+         "key": "gen_ai.prompt",
+         "value": {
+          "stringValue": "retail request ok-relookup-after-mutation"
+         }
+        },
+        {
+         "key": "gen_ai.completion",
+         "value": {
+          "stringValue": "Done."
+         }
+        },
+        {
+         "key": "faultgate.termination",
+         "value": {
+          "stringValue": "user_stop"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000d",
+       "spanId": "00000000000032c9",
+       "parentSpanId": "00000000000032c8",
+       "name": "execute_tool find_user_id_by_name_zip",
+       "startTimeUnixNano": "1760012000100000000",
+       "endTimeUnixNano": "1760012000110000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "find_user_id_by_name_zip"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"first_name\": \"Yusuf\", \"last_name\": \"Rossi\", \"zip\": \"19122\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "yusuf_rossi_9620"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000d",
+       "spanId": "00000000000032ca",
+       "parentSpanId": "00000000000032c8",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760012000200000000",
+       "endTimeUnixNano": "1760012000210000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000d",
+       "spanId": "00000000000032cb",
+       "parentSpanId": "00000000000032c8",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760012000300000000",
+       "endTimeUnixNano": "1760012000310000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000d",
+       "spanId": "00000000000032cc",
+       "parentSpanId": "00000000000032c8",
+       "name": "execute_tool modify_pending_order_address",
+       "startTimeUnixNano": "1760012000400000000",
+       "endTimeUnixNano": "1760012000410000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "modify_pending_order_address"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"address1\": \"1 Main St\", \"address2\": \"\", \"city\": \"Austin\", \"state\": \"TX\", \"country\": \"USA\", \"zip\": \"73301\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000d",
+       "spanId": "00000000000032cd",
+       "parentSpanId": "00000000000032c8",
+       "name": "execute_tool get_order_details",
+       "startTimeUnixNano": "1760012000500000000",
+       "endTimeUnixNano": "1760012000510000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "get_order_details"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"pending\"}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000d",
+       "spanId": "00000000000032ce",
+       "parentSpanId": "00000000000032c8",
+       "name": "execute_tool confirm_action",
+       "startTimeUnixNano": "1760012000600000000",
+       "endTimeUnixNano": "1760012000610000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "confirm_action"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"confirmed\": true}"
+         }
+        }
+       ]
+      },
+      {
+       "traceId": "0000000000000000000000000000000d",
+       "spanId": "00000000000032cf",
+       "parentSpanId": "00000000000032c8",
+       "name": "execute_tool cancel_pending_order",
+       "startTimeUnixNano": "1760012000700000000",
+       "endTimeUnixNano": "1760012000710000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "cancel_pending_order"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"reason\": \"no longer needed\"}"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "{\"order_id\": \"#W1\", \"user_id\": \"yusuf_rossi_9620\", \"status\": \"cancelled\"}"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
