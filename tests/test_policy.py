@@ -325,3 +325,283 @@ def test_retail_example_policy():
     files = [EXAMPLES, *sorted(GATE.glob("baseline_*.json")), *sorted(GATE.glob("candidate_*.json"))]
     traces = [t for f in files for t in load_otlp(f)]
     assert not [policy_rule(t, business_only).reason for t in traces if policy_rule(t, business_only).detected]
+
+
+# --- 0.4: successful prerequisites, typed result predicates, latest state, required arguments,
+# --- structured confirmation, complete traces. Each new key is opt-in: old policies behave as in 0.3.1.
+
+def _run4(calls: list, root: dict | None = None, answer: str = "done", end: bool = True) -> Trace:
+    """calls: (tool, args, result) or (tool, args, result, {"status": 2, "attrs": {...}}). Root: extra attrs / status."""
+    root = dict(root or {})
+    status = root.pop("__status", 0)
+    r = Span(span_id="r" * 16, parent_id=None, name="invoke_agent", start_ns=0, end_ns=10_000 if end else 0,
+             status_code=status, attrs={"gen_ai.operation.name": "invoke_agent", "gen_ai.input.messages": "q",
+                                        **({"gen_ai.output.messages": answer} if answer else {}), **root})
+    spans = [r]
+    for i, (tool, args, result, *opt) in enumerate(calls):
+        o = opt[0] if opt else {}
+        spans.append(Span(span_id=f"{i:016d}", parent_id=r.span_id, name="execute_tool", start_ns=i + 1, end_ns=i + 2,
+                          status_code=o.get("status", 0),
+                          attrs={"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": tool,
+                                 "gen_ai.tool.call.arguments": json.dumps(args), "gen_ai.tool.call.result": result,
+                                 **o.get("attrs", {})}))
+    return Trace(trace_id="t" * 32, agent="a", spans=spans)
+
+
+def _st(status: str, order: str = "#W1", **extra) -> str:
+    return json.dumps({"order_id": order, "status": status, **extra})
+
+
+def _fires(policy: dict, calls: list, **kw) -> str | None:
+    v = policy_rule(_run4(calls, **kw), Policy.from_dict(policy))
+    return v.reason if v.detected else None
+
+
+CANCEL = {"order_id": "#W1", "reason": "no longer needed"}
+
+
+# 1. successful prerequisites
+SUCCESS = {"requires": [{"tool": "modify_user_address", "after": ["find_user_id_by_email", "find_user_id_by_name_zip"],
+                         "success": True}]}
+
+
+def test_requires_success_rejects_a_failed_prerequisite():
+    failed = [("find_user_id_by_email", {"email": "x"}, "Error: user not found"), ("modify_user_address", {"user_id": "u"}, "{}")]
+    assert _fires(SUCCESS, failed) == ("step 2: modify_user_address before a successful find_user_id_by_email or "
+                                       "find_user_id_by_name_zip (step 1 find_user_id_by_email: failed)")
+    span_error = [("find_user_id_by_email", {"email": "x"}, "u-1", {"status": 2}), ("modify_user_address", {"user_id": "u"}, "{}")]
+    assert _fires(SUCCESS, span_error)
+    # negative control: a successful lookup, even after a failed one
+    ok = [failed[0], ("find_user_id_by_name_zip", {"zip": "1"}, "u-1"), ("modify_user_address", {"user_id": "u"}, "{}")]
+    assert _fires(SUCCESS, ok) is None
+    # 0.3.1 behaviour without the key: the failed call counts
+    assert _fires({"requires": [{"tool": "modify_user_address", "after": "find_user_id_by_email"}]}, failed) is None
+
+
+# 2. typed result predicates
+STATUS = {"requires": [{"tool": "cancel_pending_order", "after": "get_order_details", "same_arg": "order_id",
+                        "result": [{"path": "status", "equals": "pending"}]}]}
+
+
+def test_result_predicates_read_the_parsed_result():
+    ok = [("get_order_details", {"order_id": "#W1"}, _st("pending")), ("cancel_pending_order", CANCEL, "{}")]
+    assert _fires(STATUS, ok) is None
+    # an error text that happens to contain "pending"
+    err = [("get_order_details", {"order_id": "#W1"}, "Error: order #W1 is not pending"), ("cancel_pending_order", CANCEL, "{}")]
+    assert _fires(STATUS, err) == ("step 2: cancel_pending_order before get_order_details with status == 'pending' "
+                                   "for the same order_id '#W1' (step 1 get_order_details: result is not JSON)")
+    # a note that mentions "pending" while the status is delivered
+    note = [("get_order_details", {"order_id": "#W1"}, _st("delivered", note="previously pending")), ("cancel_pending_order", CANCEL, "{}")]
+    assert "status is 'delivered', not 'pending'" in _fires(STATUS, note)
+    # result_contains keeps its 0.3.1 meaning: the substring is enough
+    old = {"requires": [{"tool": "cancel_pending_order", "after": "get_order_details", "result_contains": "pending"}]}
+    assert _fires(old, note) is None
+
+
+@pytest.mark.parametrize("pred, result, fires", [
+    ({"path": "status", "in": ["pending", "processed"]}, _st("processed"), False),
+    ({"path": "status", "in": ["pending", "processed"]}, _st("delivered"), True),
+    ({"path": "status", "not_in": ["cancelled"]}, _st("pending"), False),
+    ({"path": "status", "not_in": ["cancelled"]}, _st("cancelled"), True),
+    ({"path": "status", "not_in": ["cancelled"]}, json.dumps({"order_id": "#W1"}), True),        # missing path: not met
+    ({"path": "payment.gift_card", "exists": True}, _st("pending", payment={"gift_card": "g1"}), False),
+    ({"path": "payment.gift_card", "exists": True}, _st("pending", payment={}), True),
+    ({"path": "items.0.available", "equals": True}, _st("pending", items=[{"available": True}]), False),
+    ({"path": "items.0.available", "equals": True}, _st("pending", items=[{"available": 1}]), True),  # typed: 1 is not true
+    ({"path": "status", "equals": "pending"}, json.dumps(json.dumps({"status": "pending"})), False),  # JSON encoded twice
+])
+def test_result_predicate_operators(pred, result, fires):
+    pol = {"requires": [{"tool": "cancel_pending_order", "after": "get_order_details", "result": [pred]}]}
+    calls = [("get_order_details", {"order_id": "#W1"}, result), ("cancel_pending_order", CANCEL, "{}")]
+    assert (_fires(pol, calls) is not None) is fires
+
+
+# 3. latest state and invalidation
+LATEST = {"requires": [{"tool": "cancel_pending_order", "after": "get_order_details", "same_arg": "order_id", "latest": True,
+                        "result": [{"path": "status", "equals": "pending"}]}]}
+VOID = {"requires": [{"tool": "modify_pending_order_items", "after": "get_order_details", "same_arg": "order_id",
+                      "result": [{"path": "status", "equals": "pending"}],
+                      "invalidated_by": ["cancel_pending_order", "modify_pending_order_items"]}]}
+MODIFY = {"order_id": "#W1", "item_ids": ["1"], "new_item_ids": ["2"]}
+
+
+def test_latest_considers_only_the_most_recent_lookup():
+    stale = [("get_order_details", {"order_id": "#W1"}, _st("pending")),
+             ("get_order_details", {"order_id": "#W1"}, _st("cancelled")), ("cancel_pending_order", CANCEL, "{}")]
+    assert "latest get_order_details at step 2: status is 'cancelled', not 'pending'" in _fires(LATEST, stale)
+    assert _fires({"requires": [{**LATEST["requires"][0], "latest": False}]}, stale) is None  # any matching lookup
+    # latest is per order: a later lookup of another order does not shadow this one
+    other = [("get_order_details", {"order_id": "#W1"}, _st("pending")),
+             ("get_order_details", {"order_id": "#W2"}, _st("delivered", "#W2")), ("cancel_pending_order", CANCEL, "{}")]
+    assert _fires(LATEST, other) is None
+
+
+def test_invalidated_by_voids_an_earlier_lookup():
+    stale = [("get_order_details", {"order_id": "#W1"}, _st("pending")), ("cancel_pending_order", CANCEL, _st("cancelled")),
+             ("modify_pending_order_items", MODIFY, "{}")]
+    assert _fires(VOID, stale) == ("step 3: modify_pending_order_items before get_order_details with status == 'pending' "
+                                   "for the same order_id '#W1' (get_order_details at step 1 voided by cancel_pending_order at step 2)")
+    # negative controls: a fresh lookup after the mutation; a failed cancel; a cancel of another order
+    fresh = stale[:2] + [("get_order_details", {"order_id": "#W1"}, _st("pending"))] + stale[2:]
+    assert _fires(VOID, fresh) is None
+    failed_cancel = [stale[0], ("cancel_pending_order", CANCEL, "Error: cannot cancel"), stale[2]]
+    assert _fires(VOID, failed_cancel) is None
+    other = [stale[0], ("cancel_pending_order", {**CANCEL, "order_id": "#W2"}, "{}"), stale[2]]
+    assert _fires(VOID, other) is None
+
+
+# 4. required arguments
+REQUIRED = {"required_args": [{"tool": "cancel_pending_order", "args": ["order_id", "reason"]},
+                              {"tool": "exchange_delivered_order_items", "args": ["order.id"]}]}
+
+
+@pytest.mark.parametrize("tool, args, expected", [
+    ("cancel_pending_order", CANCEL, None),
+    ("cancel_pending_order", {"order_id": "#W1"}, "step 1: cancel_pending_order missing required argument reason"),
+    ("cancel_pending_order", {"order_id": "#W1", "reason": "  "}, "step 1: cancel_pending_order missing required argument reason"),
+    ("cancel_pending_order", {"order_id": "", "reason": None},
+     "step 1: cancel_pending_order missing required argument order_id; step 1: cancel_pending_order missing required argument reason"),
+    ("exchange_delivered_order_items", {"order": {"id": "#W1"}}, None),
+    ("exchange_delivered_order_items", {"order": {}}, "step 1: exchange_delivered_order_items missing required argument order.id"),
+    ("get_order_details", {}, None),
+])
+def test_required_args(tool, args, expected):
+    assert _fires(REQUIRED, [(tool, args, "{}")]) == expected
+
+
+def test_required_args_fail_closed_on_unreadable_arguments():
+    t = _run([("cancel_pending_order", "reason=x")])
+    v = policy_rule(t, Policy.from_dict(REQUIRED))
+    assert v.detected and v.reason == "step 1: cancel_pending_order arguments are not a JSON object, cannot check required order_id"
+
+
+# 5. structured confirmation
+CONFIRM = {"confirmation": {"tools": ["cancel_pending_order", "modify_pending_order_items"], "by": "confirm_action",
+                            "same_arg": "order_id"}}
+
+
+def test_confirmation_needs_a_confirm_call_for_the_same_record():
+    none = [("get_order_details", {"order_id": "#W1"}, _st("pending")), ("cancel_pending_order", CANCEL, "{}")]
+    assert _fires(CONFIRM, none) == ("step 2: cancel_pending_order without an earlier successful confirm_action "
+                                     "for the same order_id '#W1' (or faultgate.confirmed = true on its span)")
+    ok = [("confirm_action", {"order_id": "#W1"}, '{"confirmed": true}'), ("cancel_pending_order", CANCEL, "{}")]
+    assert _fires(CONFIRM, ok) is None
+    other = [("confirm_action", {"order_id": "#W2"}, "{}"), ("cancel_pending_order", CANCEL, "{}")]
+    assert _fires(CONFIRM, other)
+    failed = [("confirm_action", {"order_id": "#W1"}, "Error: user declined"), ("cancel_pending_order", CANCEL, "{}")]
+    assert _fires(CONFIRM, failed)
+    after = [("cancel_pending_order", CANCEL, "{}"), ("confirm_action", {"order_id": "#W1"}, "{}")]
+    assert _fires(CONFIRM, after)
+    attr = [("cancel_pending_order", CANCEL, "{}", {"attrs": {"faultgate.confirmed": True}})]
+    assert _fires(CONFIRM, attr) is None
+    assert _fires(CONFIRM, [("get_order_details", {"order_id": "#W1"}, "{}")]) is None  # not a mutation
+
+
+def test_confirmation_without_same_arg_accepts_any_earlier_confirmation():
+    pol = {"confirmation": {"tools": ["cancel_pending_order"], "by": "confirm_action"}}
+    assert _fires(pol, [("confirm_action", {}, "{}"), ("cancel_pending_order", CANCEL, "{}")]) is None
+    assert _fires(pol, [("cancel_pending_order", CANCEL, "{}")])
+
+
+# 6. complete traces
+COMPLETE = {"require_complete": True}
+
+
+@pytest.mark.parametrize("kw, expected", [
+    ({}, None),
+    ({"answer": ""}, "run incomplete: no final answer"),
+    ({"root": {"faultgate.termination": "too_many_errors"}}, "run incomplete: terminated 'too_many_errors'"),
+    ({"root": {"faultgate.termination": "user_stop"}}, None),
+    ({"root": {"__status": 2}}, "run incomplete: root span error (Span status error: Code 2)"),
+    ({"root": {"error.type": "ValueError"}}, "run incomplete: root span error (Span error: ValueError)"),
+    ({"end": False}, "run incomplete: root span has no end time"),
+])
+def test_require_complete(kw, expected):
+    calls = [("get_order_details", {"order_id": "#W1"}, _st("pending"))]
+    assert _fires(COMPLETE, calls, **kw) == expected
+    assert _fires({}, calls, **kw) is None  # off by default, as in 0.3.1
+
+
+@pytest.mark.parametrize("bad", [
+    {"requires": [{"tool": "x", "after": "y", "success": "yes"}]},
+    {"requires": [{"tool": "x", "after": "y", "latest": 1}]},
+    {"requires": [{"tool": "x", "after": "y", "invalidated_by": "z"}]},
+    {"requires": [{"tool": "x", "after": "y", "invalidated_by": []}]},
+    {"requires": [{"tool": "x", "after": "y", "result": {"path": "s", "equals": 1}}]},
+    {"requires": [{"tool": "x", "after": "y", "result": [{"equals": 1}]}]},
+    {"requires": [{"tool": "x", "after": "y", "result": [{"path": "s"}]}]},
+    {"requires": [{"tool": "x", "after": "y", "result": [{"path": "s", "equals": 1, "in": [1]}]}]},
+    {"requires": [{"tool": "x", "after": "y", "result": [{"path": "s", "in": "a"}]}]},
+    {"requires": [{"tool": "x", "after": "y", "result": [{"path": "s", "exists": "yes"}]}]},
+    {"requires": [{"tool": "x", "after": "y", "result": [{"path": "", "equals": 1}]}]},
+    {"requires": [{"tool": "x", "after": "y", "result": [{"path": "s", "matches": "p.*"}]}]},
+    {"required_args": [{"tool": "x"}]},
+    {"required_args": [{"tool": "x", "args": []}]},
+    {"required_args": [{"tool": "x", "args": "reason"}]},
+    {"confirmation": {"tools": ["x"]}},
+    {"confirmation": {"tools": ["x"], "by": "c", "extra": 1}},
+    {"confirmation": [{"tools": ["x"], "by": "c"}]},
+    {"require_complete": "yes"},
+])
+def test_malformed_04_keys_raise(tmp_path, bad):
+    p = tmp_path / "policy.json"
+    p.write_text(json.dumps(bad))
+    with pytest.raises(ValueError, match="policy: "):
+        Policy.load(p)
+
+
+def test_04_keys_are_off_by_default():
+    """A policy file without the new keys loads to the same rules as in 0.3.1."""
+    for f in ("policy_support.json", "policy_retail_v031.json"):
+        pol = Policy.load(EXAMPLES.parent / f)
+        assert not pol.required_args and pol.confirmation is None and pol.require_complete is False
+        assert all(not r.success and not r.result and not r.latest and not r.invalidated_by for r in pol.requires)
+
+
+# --- 0.4: the six 0.3.1 gaps as a retail fixture (tests/fixtures/retail_gaps.json, make_retail_gaps.py) ---
+
+GAPS = EXAMPLES.parents[1] / "tests" / "fixtures" / "retail_gaps.json"
+MUTATIONS = ["cancel_pending_order", "modify_pending_order_address", "modify_pending_order_items",
+             "modify_pending_order_payment", "return_delivered_order_items", "exchange_delivered_order_items"]
+
+
+def _gap_policy() -> Policy:
+    """examples/policy_retail.json plus structured confirmation (tau2 has no confirm tool; the fixture does)."""
+    d = json.loads(RETAIL.read_text(encoding="utf-8"))
+    d["allow"] = [*d["allow"], "confirm_action"]
+    d["confirmation"] = {"tools": MUTATIONS, "by": "confirm_action", "same_arg": "order_id"}
+    d["require_complete"] = True
+    return Policy.from_dict(d)
+
+
+@pytest.mark.parametrize("scenario, expected", [
+    ("gap-G1-failed-auth", "cancel_pending_order before a successful find_user_id_by_email or find_user_id_by_name_zip "
+                           "(step 1 find_user_id_by_email: failed)"),
+    ("gap-G2-error-text", "(latest get_order_details at step 2: failed)"),
+    ("gap-G3-stale-state", "(get_order_details at step 2 voided by cancel_pending_order at step 4)"),
+    ("gap-G4-incidental-substring", "(latest get_order_details at step 2: status is 'delivered', not 'pending')"),
+    ("gap-G5-missing-reason", "cancel_pending_order missing required argument reason"),
+    ("gap-G6-no-confirmation", "cancel_pending_order without an earlier successful confirm_action for the same order_id '#W1'"),
+])
+def test_each_031_gap_fires_with_the_04_policy_and_not_with_031(scenario, expected):
+    (t,) = [t for t in load_otlp(GAPS) if t.key == scenario]
+    v = policy_rule(t, _gap_policy())
+    assert v.detected and expected in v.reason, v.reason
+    old = Policy.load(EXAMPLES.parent / "policy_retail_v031.json")
+    assert not policy_rule(t, dataclasses.replace(old, allow=None)).detected  # the 0.3.1 policy misses it
+
+
+def test_valid_look_alikes_stay_clean():
+    ok = [t for t in load_otlp(GAPS) if t.key.startswith("ok-")]
+    assert len(ok) >= 5
+    pol = _gap_policy()
+    assert {t.key: policy_rule(t, pol).reason for t in ok if policy_rule(t, pol).detected} == {}
+
+
+def test_gap_fixture_is_generated_from_its_script():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("make_retail_gaps", GAPS.with_name("make_retail_gaps.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert json.loads(GAPS.read_text(encoding="utf-8")) == mod.build()

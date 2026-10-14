@@ -66,7 +66,28 @@ class Report:
     def passed(self) -> bool:
         return not self.failed_traces
 
+    @property
+    def outcome(self) -> dict | None:
+        """With an ``outcome`` check: outcome rate over judged scenarios, next to the structural clean rate. Else None."""
+        if "outcome" not in self.checks:
+            return None
+        rows = [r for r in self.results if r.check == "outcome"]
+        judged = [r for r in rows if r.verdict.confidence > 0]
+        true = sum(not r.verdict.detected for r in judged)
+        n = len(self.trace_ids)
+        structural = {r.trace_id for r in self.results if r.check != "outcome" and r.verdict.detected}
+        return {"judged": len(judged), "missing": len(rows) - len(judged), "true": true,
+                "outcome_rate": round(true / len(judged), 4) if judged else None,
+                "structural_clean_rate": round((n - len(structural)) / n, 4) if n else None,
+                "clean_rate": round((n - len(self.failed_traces)) / n, 4) if n else None}
+
     def to_dict(self) -> dict:
+        out = self._dict()
+        if self.outcome is not None:
+            out["outcome"] = self.outcome
+        return out
+
+    def _dict(self) -> dict:
         return {
             "judge": self.judge,
             "checks": self.checks,

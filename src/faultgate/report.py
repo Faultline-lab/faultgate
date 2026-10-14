@@ -70,6 +70,8 @@ def markdown(report: Report, gate: dict[str, Any] | None, band: dict[str, Any] |
             lines.append(f"**Regressions** (clean in every baseline run, not now): {shown}{more}")
         lines.append("")
     lines.append(f"{len(report.failed_traces)}/{n} traces failed · judge {report.judge} · redaction {report.redaction}")
+    if report.outcome is not None:
+        lines += ["", _outcome_line(report.outcome, markdown=True)]
     lines += ["", "| check | fired |", "|---|---|"]
     lines += [f"| {_cell(c)} | {k} |" for c, k in report.fired.items()]
     violations = gate["policy_violations"] if gate else report.fired_on("policy")
@@ -94,6 +96,15 @@ def markdown(report: Report, gate: dict[str, Any] | None, band: dict[str, Any] |
             lines.append(f"| {LABELS.get(m, m)} | {_fmt(m, u['baseline'])} | {_fmt(m, u['candidate'])} | {u['delta_pct']:+.1f}% |")
     lines += ["", "### Reproduce locally", "", "```sh", f"pip install 'faultgate=={__version__}'", command, "```", ""]
     return "\n".join(lines)
+
+
+def _outcome_line(o: dict[str, Any], markdown: bool = False) -> str:
+    """Outcome rate and structural clean rate, kept apart: they answer different questions."""
+    rate = f"{o['true']}/{o['judged']} true ({o['outcome_rate']:.2f})" if o["judged"] else "no scenario has an outcome"
+    if markdown:
+        return f"**Outcome:** {rate} · {o['missing']} without an outcome · structural clean rate {o['structural_clean_rate']:.2f}"
+    return (f"outcome: {rate} · {o['missing']} scenario(s) without an outcome, not judged · "
+            f"structural clean rate {o['structural_clean_rate']:.2f}")
 
 
 def _sha256(path: str) -> str:

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from faultgate.checks import CHECKS, _empty_result, search_loop_rule
@@ -414,3 +416,38 @@ def test_abstention_catches_information_not_found(answer):
     root = Span(span_id="r", parent_id=None, name="invoke_agent", start_ns=1,
                 attrs={"gen_ai.operation.name": "invoke_agent", "gen_ai.completion": answer})
     assert abstention_rule(Trace(trace_id="t", agent="a", spans=[root])).detected
+
+
+# --- 0.4: outcomes from the user's own evaluator ---
+
+def _keys(path=EXAMPLES):
+    return [t.key for t in load_otlp(path)]
+
+
+def test_outcome_check_is_opt_in_and_reads_the_outcomes_file(tmp_path):
+    from faultgate.checks import Outcomes, outcome_rule, select
+
+    assert "outcome" not in [c.name for c in select(None)]  # no file: not in the default set, report unchanged
+    p = tmp_path / "outcomes.json"
+    keys = _keys()
+    p.write_text(json.dumps({keys[0]: True, keys[1]: False}))
+    outcomes = Outcomes.load(p)
+    checks = select(None, outcomes=outcomes)
+    assert checks[-1].name == "outcome" and checks[-1].kind == "outcome"
+    traces = load_otlp(EXAMPLES)
+    assert not outcome_rule(traces[0], outcomes).detected
+    v = outcome_rule(traces[1], outcomes)
+    assert v.detected and v.reason == "outcome false in the outcomes file"
+    v = outcome_rule(traces[2], outcomes)
+    assert not v.detected and v.confidence == 0.0 and v.reason == "no outcome for this scenario"
+    assert [c.name for c in select("outcome,policy", outcomes=outcomes)] == ["outcome", "policy"]
+
+
+@pytest.mark.parametrize("bad", ['["a"]', '{"a": "yes"}', '{"a": 1}', "{not json"])
+def test_outcomes_file_must_map_keys_to_booleans(tmp_path, bad):
+    from faultgate.checks import Outcomes
+
+    p = tmp_path / "outcomes.json"
+    p.write_text(bad)
+    with pytest.raises(ValueError):
+        Outcomes.load(p)

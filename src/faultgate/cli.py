@@ -10,15 +10,15 @@ from pathlib import Path
 
 from faultgate import __version__
 from faultgate import band as bandmod
-from faultgate.checks import CHECKS, Golden, Policy, select
+from faultgate.checks import CHECKS, OUTCOME, Golden, Outcomes, Policy, select
 from faultgate.judge import JUDGE_SPECS, get_judge
 from faultgate.runner import Report
 from faultgate.runner import run as run_checks
 from faultgate.formats import FORMATS
 from faultgate.formats import load as load_traces
-from faultgate.precheck import DEFAULT_SAMPLE, precheck
+from faultgate.precheck import DEFAULT_SAMPLE, describe_policy, precheck
 from faultgate.redact import REDACTIONS, get_redactor
-from faultgate.report import display_path, markdown, write_audit
+from faultgate.report import _outcome_line, display_path, markdown, write_audit
 
 
 def _table(report: Report) -> str:
@@ -56,10 +56,14 @@ def _judge_or_none(args, checks):
     judge = get_judge(args.judge) if args.judge else None
     no_judge = [c.name for c in checks if c.kind == "judge"] if judge is None else []
     no_golden = [c.name for c in checks if c.kind == "golden" and c.rule is None]
-    if len(no_judge) + len(no_golden) == len(checks):
+    no_outcome = [c.name for c in checks if c.kind == "outcome" and c.rule is None]
+    if len(no_judge) + len(no_golden) + len(no_outcome) == len(checks):
         raise ValueError("nothing to run: " + "; ".join(
             filter(None, [no_judge and f"{', '.join(no_judge)} need --judge laya | litellm:<model>",
-                          no_golden and f"{', '.join(no_golden)} need --golden golden.json"])))
+                          no_golden and f"{', '.join(no_golden)} need --golden golden.json",
+                          no_outcome and "outcome needs --outcomes outcomes.json"])))
+    for name in no_outcome:
+        print(f"note: {name} skipped — it needs --outcomes outcomes.json (true / false per scenario)", file=sys.stderr)
     for name in no_judge:
         print(f"note: {name} skipped — it needs a judge (--judge laya | litellm:<model>); see README for each judge's measured κ", file=sys.stderr)
     for name in no_golden:
@@ -75,9 +79,13 @@ def _policy(args) -> Policy | None:
     return Policy.load(args.policy) if args.policy else None
 
 
+def _outcomes(args) -> Outcomes | None:
+    return Outcomes.load(args.outcomes) if getattr(args, "outcomes", None) else None
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     try:
-        checks = select(args.check, _policy(args), _golden(args))
+        checks = select(args.check, _policy(args), _golden(args), _outcomes(args))
         judge = _judge_or_none(args, checks)
         band = json.loads(Path(args.band).read_text(encoding="utf-8")) if args.band else None
         report, elapsed = _run(args.traces, checks, judge, args.format, get_redactor(args.redact))
@@ -88,6 +96,8 @@ def cmd_check(args: argparse.Namespace) -> int:
     print(_table(report))
     fired = ", ".join(f"{k}={v}" for k, v in report.fired.items())
     print(f"\n{len(report.failed_traces)}/{len(report.trace_ids)} traces failed · {fired} · judge {report.judge} · {elapsed:.1f}s")
+    if report.outcome is not None:
+        print(_outcome_line(report.outcome))
     if judge and getattr(judge, "truncated", None):
         print(f"warning: {judge.truncated}/{judge.calls} judge calls exceeded Laya's 512-token context; those verdicts saw a truncated trace", file=sys.stderr)
 
@@ -119,7 +129,8 @@ def cmd_check(args: argparse.Namespace) -> int:
             _write(args.markdown, markdown(report, out.get("gate"), band, command))
             print(f"markdown written to {args.markdown}")
         if args.audit:
-            inputs = {"traces": args.traces, "band": args.band, "policy": args.policy, "golden": args.golden}
+            inputs = {"traces": args.traces, "band": args.band, "policy": args.policy, "golden": args.golden,
+                  "outcomes": args.outcomes}
             write_audit(args.audit, report, out.get("gate"), inputs, command, code)
             print(f"audit written to {args.audit}")
     except OSError as e:
@@ -157,7 +168,7 @@ def _repro(argv: list[str]) -> str:
 
 def cmd_baseline(args: argparse.Namespace) -> int:
     try:
-        checks = select(args.check, _policy(args), _golden(args))
+        checks = select(args.check, _policy(args), _golden(args), _outcomes(args))
         judge = _judge_or_none(args, checks)
         reports = []
         redactor = get_redactor(args.redact)
@@ -184,7 +195,15 @@ def cmd_baseline(args: argparse.Namespace) -> int:
 
 
 def cmd_precheck(args: argparse.Namespace) -> int:
-    fmt, total, checked, steps, issues = precheck(args.traces, args.format, args.sample)
+    needs_json = False
+    if args.policy:
+        try:
+            keys, needs_json = describe_policy(args.policy)
+        except (ValueError, OSError) as e:
+            print(f"faultgate: {e}", file=sys.stderr)
+            return 2
+        print(f"policy keys: {keys}")
+    fmt, total, checked, steps, issues = precheck(args.traces, args.format, args.sample, needs_json)
     for i in issues:
         print(f"{i.level:<8} {i.trace_id:<12}  {i.message}")
     errors = sum(i.level == "error" for i in issues)
@@ -196,7 +215,7 @@ def cmd_precheck(args: argparse.Namespace) -> int:
 
 
 def cmd_checks(_: argparse.Namespace) -> int:
-    for c in CHECKS.values():
+    for c in [*CHECKS.values(), OUTCOME]:
         print(f"{c.name:<16} {c.kind:<6} {c.description}")
     return 0
 
@@ -222,6 +241,8 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--policy", default=None, help='policy.json: {"allow": [...], "max_calls": N, "max_arg_chars": N, "deny_patterns": [...], '
                                                   '"limits": [...], "identity": {...}, "requires": [...]}; a violation fails the gate even with --band')
     c.add_argument("--golden", default=None, help="golden.json: {scenario key or prompt: expected answer}; enables wrong_answer and truncation")
+    c.add_argument("--outcomes", default=None, help="outcomes.json: {scenario key or prompt: true | false} from your own evaluator; "
+                                                    "enables the outcome check")
     c.add_argument("--format", default="auto", choices=FORMATS, help="trace format (default: detect)")
     c.add_argument("--redact", default="builtin", choices=REDACTIONS,
                    help="mask PII and secrets in judge input (API judges) and in every reason written out (default builtin)")
@@ -232,6 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--check", default=None)
     b.add_argument("--policy", default=None)
     b.add_argument("--golden", default=None)
+    b.add_argument("--outcomes", default=None, help="outcomes.json: {scenario key or prompt: true | false}")
     b.add_argument("--out", default="band.json")
     b.add_argument("--format", default="auto", choices=FORMATS, help="trace format (default: detect)")
     b.add_argument("--redact", default="builtin", choices=REDACTIONS,
@@ -241,6 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("traces", help="trace export: OTLP/JSON, OpenInference, Langfuse, LangSmith or Braintrust")
     pc.add_argument("--format", default="auto", choices=FORMATS)
     pc.add_argument("--sample", type=int, default=DEFAULT_SAMPLE, help=f"traces to inspect (default {DEFAULT_SAMPLE}; 0 = all)")
+    pc.add_argument("--policy", default=None, help="policy.json: list the keys it uses and check the traces carry what they read")
     pc.set_defaults(fn=cmd_precheck)
     sub.add_parser("checks", help="list built-in checks").set_defaults(fn=cmd_checks)
     sub.add_parser("judges", help="list judge specs").set_defaults(fn=cmd_judges)
