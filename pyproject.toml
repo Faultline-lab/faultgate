@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "faultgate"
-version = "0.4.0"
+version = "0.4.1"
 description = "Local-first release gate for AI agents: check recorded traces for known failure modes through a pluggable judge."
 readme = "README.md"
 license = "MIT"

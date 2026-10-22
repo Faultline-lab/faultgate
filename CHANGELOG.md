@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-10-22
+
+- `redact.find(text)`: return every private value in text as `(start, end, kind)` for the Trace-to-Fixture spec, evaluated in `PATTERNS` order with overlaps removed (earlier pattern wins, later overlapping span dropped) and sorted by start.
+- Card matches (`_card`) return each Luhn-valid whole digit group window as its own span without trailing/adjacent non-card digits; phone validator keeps only 9-15 digit matches.
+- `_builtin` rewritten to replace spans from `find()` right to left with identical masking output; replacement functions refactored with span-returning counterparts while keeping `PATTERNS` shape unchanged.
+
 ## 0.4.0 — 2026-10-14
 
 Closes the six policy gaps an outside client found in 0.3.1 (17 retail probes: 6 caught, 6 missed) and adds an outcome input.
