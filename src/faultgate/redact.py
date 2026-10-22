@@ -31,6 +31,25 @@ def _luhn(digits: str) -> bool:
     return total % 10 == 0
 
 
+def _card_spans(m: re.Match[str]) -> list[tuple[int, int]]:
+    """Return every Luhn-valid 13-19 digit window of whole digit groups in m as (start, end)."""
+    text = m.group(0)
+    base = m.start()
+    groups = [(g.start(), g.end()) for g in re.finditer(r"\d+", text)]
+    spans: list[tuple[int, int]] = []
+    i = 0
+    while i < len(groups):
+        for j in range(len(groups), i, -1):
+            digits = "".join(text[a:b] for a, b in groups[i:j])
+            if 13 <= len(digits) <= 19 and _luhn(digits):
+                spans.append((base + groups[i][0], base + groups[j - 1][1]))
+                i = j
+                break
+        else:
+            i += 1
+    return spans
+
+
 def _card(m: re.Match[str], tag: str) -> str:
     """Mask every Luhn-valid 13-19 digit window of whole digit groups in a run of groups.
 
@@ -38,22 +57,26 @@ def _card(m: re.Match[str], tag: str) -> str:
     ("4111 1111 1111 1111 123-45-6789"). Testing only the whole run let the card through.
     """
     text = m.group(0)
-    groups = [(g.start(), g.end()) for g in re.finditer(r"\d+", text)]
-    out, done, i = [], 0, 0
-    while i < len(groups):
-        for j in range(len(groups), i, -1):
-            digits = "".join(text[a:b] for a, b in groups[i:j])
-            if 13 <= len(digits) <= 19 and _luhn(digits):
-                out += [text[done:groups[i][0]], tag]
-                done, i = groups[j - 1][1], j
-                break
-        else:
-            i += 1
+    base = m.start()
+    out, done = [], 0
+    for start, end in _card_spans(m):
+        out += [text[done:start - base], tag]
+        done = end - base
     return "".join(out) + text[done:]
 
 
+def _phone_spans(m: re.Match[str]) -> list[tuple[int, int]]:
+    return [(m.start(), m.end())] if 9 <= len(re.sub(r"\D", "", m.group(0))) <= 15 else []
+
+
 def _phone(m: re.Match[str], tag: str) -> str:
-    return tag if 9 <= len(re.sub(r"\D", "", m.group(0))) <= 15 else m.group(0)
+    return tag if _phone_spans(m) else m.group(0)
+
+
+_SPANS_FN: dict[Callable[[re.Match[str], str], str], Callable[[re.Match[str]], list[tuple[int, int]]]] = {
+    _card: _card_spans,
+    _phone: _phone_spans,
+}
 
 
 # Order matters: secrets, SSNs and cards before the looser phone / IP patterns.
@@ -88,6 +111,35 @@ PATTERNS: list[tuple[str, re.Pattern[str], Callable[[re.Match[str], str], str] |
 ]
 
 
+def find(text: str) -> list[tuple[int, int, str]]:
+    """Return every private value in text as (start, end, kind), in PATTERNS order with overlaps removed."""
+    if not text:
+        return []
+    taken: list[tuple[int, int, str]] = []
+    work = text
+    for kind, rx, sub in PATTERNS:
+        found: list[tuple[int, int]] = []
+        for m in rx.finditer(work):
+            if sub is None:
+                found.append((m.start(), m.end()))
+            elif sub in _SPANS_FN:
+                found.extend(_SPANS_FN[sub](m))
+            else:
+                found.append((m.start(), m.end()))
+        found = [(s, e) for s, e in found if e > s]
+        if not found:
+            continue
+        taken.extend((s, e, kind) for s, e in found)
+        # Later patterns see earlier matches as masked (same length, so offsets stay valid): an SSN written
+        # beside a card must not join the card's digit run, exactly as sequential replacement behaved.
+        chars = list(work)
+        for s, e in found:
+            chars[s:e] = "\x00" * (e - s)
+        work = "".join(chars)
+    taken.sort(key=lambda s: s[0])
+    return taken
+
+
 @dataclass(frozen=True)
 class Redactor:
     name: str
@@ -98,9 +150,8 @@ class Redactor:
 
 
 def _builtin(text: str) -> str:
-    for kind, rx, sub in PATTERNS:
-        tag = f"<{kind}>"
-        text = rx.sub(lambda m: tag if sub is None else sub(m, tag), text)
+    for start, end, kind in reversed(find(text)):
+        text = text[:start] + f"<{kind}>" + text[end:]
     return text
 
 
