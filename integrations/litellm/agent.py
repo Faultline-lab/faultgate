@@ -72,3 +72,79 @@ class JsonFileExporter(SpanExporter):
             out.append(item)
         with open(path, "w") as f:
             json.dump({"resourceSpans": [{"scopeSpans": [{"spans": out}]}]}, f, indent=1)
+
+import os
+
+import litellm
+from openinference.instrumentation.litellm import LiteLLMInstrumentor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+BASE_URL = "https://aicredits.in/v1"
+MODEL = "openai/gpt-6-luna"  # LiteLLM sees "openai/" + MODEL (an OpenAI-style server)
+SYSTEM_PROMPT = (
+    "You are a customer support agent. Use the tools. "
+    "Always look up an order before you cancel or refund it."
+)
+
+# Turn on tracing: save every span (model calls + tool calls) in memory.
+EXPORTER = JsonFileExporter()
+PROVIDER = TracerProvider()
+PROVIDER.add_span_processor(SimpleSpanProcessor(EXPORTER))
+LiteLLMInstrumentor().instrument(tracer_provider=PROVIDER)  # records model calls
+TRACER = PROVIDER.get_tracer("support_agent")
+
+
+def _schema(name, desc, props):
+    params = {"type": "object", "properties": props, "required": list(props)}
+    return {"type": "function", "function": {"name": name, "description": desc, "parameters": params}}
+
+
+_S = {"type": "string"}
+TOOL_SCHEMAS = [
+    _schema("lookup_order", "Look up an order.", {"order_id": _S}),
+    _schema("cancel_order", "Cancel an order.", {"order_id": _S, "reason": _S}),
+    _schema("issue_refund", "Refund an order.", {"order_id": _S, "amount": {"type": "number"}}),
+]
+
+
+def run_tool(name, args, tools):
+    """Run one tool and record it as a TOOL span (what faultgate reads)."""
+    with TRACER.start_as_current_span(name) as span:
+        span.set_attribute("openinference.span.kind", "TOOL")
+        span.set_attribute("tool.name", name)
+        span.set_attribute("input.value", json.dumps(args))
+        try:
+            result = tools[name](**args) if name in tools else {"error": "unknown tool"}
+        except TypeError:
+            result = {"error": "bad arguments"}
+        span.set_attribute("output.value", json.dumps(result))
+    return result
+
+
+def run_agent(user_request, system_prompt=SYSTEM_PROMPT, tools=TOOLS, max_steps=8):
+    """Run one request. Returns (final answer, number of tool calls made)."""
+    messages = [{"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_request}]
+    answer, calls = "", 0
+    with TRACER.start_as_current_span("support_agent") as root:
+        root.set_attribute("openinference.span.kind", "AGENT")
+        root.set_attribute("input.value", user_request)
+        for _ in range(max_steps):
+            reply = litellm.completion(
+                model="openai/" + MODEL, api_base=BASE_URL,
+                api_key=os.environ["AICREDITS_API_KEY"],
+                messages=messages, tools=TOOL_SCHEMAS,
+            ).choices[0].message
+            messages.append(reply)
+            if not reply.tool_calls:
+                answer = reply.content or ""
+                break
+            for call in reply.tool_calls:
+                args = json.loads(call.function.arguments or "{}")
+                result = run_tool(call.function.name, args, tools)
+                calls += 1
+                messages.append({"role": "tool", "tool_call_id": call.id,
+                                 "content": json.dumps(result)})
+        root.set_attribute("output.value", answer)
+    return answer, calls
