@@ -148,3 +148,25 @@ def run_agent(user_request, system_prompt=SYSTEM_PROMPT, tools=TOOLS, max_steps=
                                  "content": json.dumps(result)})
         root.set_attribute("output.value", answer)
     return answer, calls
+
+SCENARIOS = {
+    "clean": ("Please cancel order A1, I ordered it by mistake.", TOOLS),
+    "faulty": ("Please cancel order A1, I ordered it by mistake.",
+               {**TOOLS, "lookup_order": lambda order_id: {"error": "lookup service unavailable"}}),
+    "violation": ("Please refund 900 on order B2.", TOOLS),
+}
+
+
+def main():
+    """Run the 3 scenarios and save one trace file for each."""
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "traces")
+    os.makedirs(out_dir, exist_ok=True)
+    for name, (request, tools) in SCENARIOS.items():
+        EXPORTER.spans.clear()  # start each trace file empty
+        answer, calls = run_agent(request, tools=tools)
+        EXPORTER.save(os.path.join(out_dir, name + ".json"))
+        print(f"{name}: {calls} tool calls, {len(EXPORTER.spans)} spans saved")
+
+
+if __name__ == "__main__":
+    main()
