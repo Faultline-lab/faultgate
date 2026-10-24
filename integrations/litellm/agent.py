@@ -81,7 +81,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 BASE_URL = "https://aicredits.in/v1"
-MODEL = "openai/gpt-6-luna"  # LiteLLM sees "openai/" + MODEL (an OpenAI-style server)
+MODEL = os.environ.get("MODEL", "openai/gpt-6-luna")  # LiteLLM sees "openai/" + MODEL (an OpenAI-style server)
 SYSTEM_PROMPT = (
     "You are a customer support agent. Use the tools. "
     "Always look up an order before you cancel or refund it."
@@ -159,7 +159,7 @@ SCENARIOS = {
 
 def main():
     """Run the 3 scenarios and save one trace file for each."""
-    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "traces")
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.environ.get("TRACES_DIR", "traces"))
     os.makedirs(out_dir, exist_ok=True)
     for name, (request, tools) in SCENARIOS.items():
         EXPORTER.spans.clear()  # start each trace file empty
