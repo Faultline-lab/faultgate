@@ -1,0 +1,695 @@
+{
+ "resourceSpans": [
+  {
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "8128ef7f02379dbe1a6329694b28903a",
+       "spanId": "c1a684375b2e1a0f",
+       "name": "completion",
+       "startTimeUnixNano": "1792837309936153900",
+       "endTimeUnixNano": "1792837311750154000",
+       "attributes": [
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "openai/openai/gpt-6-luna"
+         }
+        },
+        {
+         "key": "llm.provider",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.role",
+         "value": {
+          "stringValue": "system"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.content",
+         "value": {
+          "stringValue": "You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it."
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.role",
+         "value": {
+          "stringValue": "user"
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.content",
+         "value": {
+          "stringValue": "Please cancel order A1, I ordered it by mistake."
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please cancel order A1, I ordered it by mistake.\"}]}"
+         }
+        },
+        {
+         "key": "input.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.invocation_parameters",
+         "value": {
+          "stringValue": "{\"model\": \"openai/openai/gpt-6-luna\", \"api_base\": \"https://aicredits.in/v1\", \"tools\": [{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}]}"
+         }
+        },
+        {
+         "key": "llm.tools.0.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.1.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.2.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"id\":\"resp_0e82a9a19a9bc8d7016adc86be569087d295993ef3f55ec395\",\"created\":1792837310,\"model\":\"gpt-6-luna\",\"object\":\"chat.completion\",\"system_fingerprint\":null,\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"order_id\\\":\\\"A1\\\"}\",\"name\":\"lookup_order\"},\"id\":\"call_487DzK5SL35YaB8ftWZVvbhP\",\"type\":\"function\"}],\"function_call\":null,\"provider_specific_fields\":{\"refusal\":null}},\"provider_specific_fields\":{}}],\"usage\":{\"completion_tokens\":20,\"prompt_tokens\":128,\"total_tokens\":148,\"completion_tokens_details\":{\"accepted_prediction_tokens\":null,\"audio_tokens\":null,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":null,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null},\"prompt_tokens_details\":{\"audio_tokens\":null,\"cache_write_tokens\":0,\"cached_tokens\":0,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null,\"cache_creation_tokens\":0},\"cost\":0.0025741964369088,\"cost_details\":{\"completion_cost_inr\":0.0011290335249600002,\"prompt_cost_inr\":0.0014451629119488004},\"latency_ms\":1552},\"moderation\":null,\"service_tier\":null}"
+         }
+        },
+        {
+         "key": "output.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_487DzK5SL35YaB8ftWZVvbhP"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"A1\"}"
+         }
+        },
+        {
+         "key": "llm.finish_reason",
+         "value": {
+          "stringValue": "tool_calls"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt",
+         "value": {
+          "intValue": "128"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt_details.cache_read",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.completion",
+         "value": {
+          "intValue": "20"
+         }
+        },
+        {
+         "key": "llm.token_count.completion_details.reasoning",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.total",
+         "value": {
+          "intValue": "148"
+         }
+        },
+        {
+         "key": "llm.cost.total",
+         "value": {
+          "doubleValue": 2.28e-05
+         }
+        },
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        }
+       ],
+       "parentSpanId": "adad8f78d002d1cb"
+      },
+      {
+       "traceId": "8128ef7f02379dbe1a6329694b28903a",
+       "spanId": "55068540321f67f0",
+       "name": "lookup_order",
+       "startTimeUnixNano": "1792837311750209900",
+       "endTimeUnixNano": "1792837311750229100",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "TOOL"
+         }
+        },
+        {
+         "key": "tool.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"order_id\": \"A1\"}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"error\": \"lookup service unavailable\"}"
+         }
+        }
+       ],
+       "parentSpanId": "adad8f78d002d1cb"
+      },
+      {
+       "traceId": "8128ef7f02379dbe1a6329694b28903a",
+       "spanId": "a3f7a772943b3899",
+       "name": "completion",
+       "startTimeUnixNano": "1792837311750281800",
+       "endTimeUnixNano": "1792837313815936700",
+       "attributes": [
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "openai/openai/gpt-6-luna"
+         }
+        },
+        {
+         "key": "llm.provider",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.role",
+         "value": {
+          "stringValue": "system"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.content",
+         "value": {
+          "stringValue": "You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it."
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.role",
+         "value": {
+          "stringValue": "user"
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.content",
+         "value": {
+          "stringValue": "Please cancel order A1, I ordered it by mistake."
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_487DzK5SL35YaB8ftWZVvbhP"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"A1\"}"
+         }
+        },
+        {
+         "key": "llm.input_messages.3.message.role",
+         "value": {
+          "stringValue": "tool"
+         }
+        },
+        {
+         "key": "llm.input_messages.3.message.content",
+         "value": {
+          "stringValue": "{\"error\": \"lookup service unavailable\"}"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please cancel order A1, I ordered it by mistake.\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_487DzK5SL35YaB8ftWZVvbhP\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_487DzK5SL35YaB8ftWZVvbhP\", \"content\": \"{\\\"error\\\": \\\"lookup service unavailable\\\"}\"}]}"
+         }
+        },
+        {
+         "key": "input.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.invocation_parameters",
+         "value": {
+          "stringValue": "{\"model\": \"openai/openai/gpt-6-luna\", \"api_base\": \"https://aicredits.in/v1\", \"tools\": [{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}]}"
+         }
+        },
+        {
+         "key": "llm.tools.0.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.1.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.2.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"id\":\"resp_07de305acd4c114b016adc86c0192487d292add8349a8373f4\",\"created\":1792837312,\"model\":\"gpt-6-luna\",\"object\":\"chat.completion\",\"system_fingerprint\":null,\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"order_id\\\":\\\"A1\\\"}\",\"name\":\"lookup_order\"},\"id\":\"call_4O6kP2LFRUIdvka8HzxbJQb1\",\"type\":\"function\"}],\"function_call\":null,\"provider_specific_fields\":{\"refusal\":null}},\"provider_specific_fields\":{}}],\"usage\":{\"completion_tokens\":51,\"prompt_tokens\":167,\"total_tokens\":218,\"completion_tokens_details\":{\"accepted_prediction_tokens\":null,\"audio_tokens\":null,\"reasoning_tokens\":29,\"rejected_prediction_tokens\":null,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null},\"prompt_tokens_details\":{\"audio_tokens\":null,\"cache_write_tokens\":0,\"cached_tokens\":0,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null,\"cache_creation_tokens\":0},\"cost\":0.004764521475331201,\"cost_details\":{\"completion_cost_inr\":0.002879035488648,\"prompt_cost_inr\":0.0018854859866832005},\"latency_ms\":1817},\"moderation\":null,\"service_tier\":null}"
+         }
+        },
+        {
+         "key": "output.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_4O6kP2LFRUIdvka8HzxbJQb1"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"A1\"}"
+         }
+        },
+        {
+         "key": "llm.finish_reason",
+         "value": {
+          "stringValue": "tool_calls"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt",
+         "value": {
+          "intValue": "167"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt_details.cache_read",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.completion",
+         "value": {
+          "intValue": "51"
+         }
+        },
+        {
+         "key": "llm.token_count.completion_details.reasoning",
+         "value": {
+          "intValue": "29"
+         }
+        },
+        {
+         "key": "llm.token_count.total",
+         "value": {
+          "intValue": "218"
+         }
+        },
+        {
+         "key": "llm.cost.total",
+         "value": {
+          "doubleValue": 4.2199999999999996e-05
+         }
+        },
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        }
+       ],
+       "parentSpanId": "adad8f78d002d1cb"
+      },
+      {
+       "traceId": "8128ef7f02379dbe1a6329694b28903a",
+       "spanId": "57a955424fa96b12",
+       "name": "lookup_order",
+       "startTimeUnixNano": "1792837313816072200",
+       "endTimeUnixNano": "1792837313816126900",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "TOOL"
+         }
+        },
+        {
+         "key": "tool.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"order_id\": \"A1\"}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"error\": \"lookup service unavailable\"}"
+         }
+        }
+       ],
+       "parentSpanId": "adad8f78d002d1cb"
+      },
+      {
+       "traceId": "8128ef7f02379dbe1a6329694b28903a",
+       "spanId": "d99249a75cdd9303",
+       "name": "completion",
+       "startTimeUnixNano": "1792837313816252200",
+       "endTimeUnixNano": "1792837315650473200",
+       "attributes": [
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "openai/openai/gpt-6-luna"
+         }
+        },
+        {
+         "key": "llm.provider",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.role",
+         "value": {
+          "stringValue": "system"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.content",
+         "value": {
+          "stringValue": "You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it."
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.role",
+         "value": {
+          "stringValue": "user"
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.content",
+         "value": {
+          "stringValue": "Please cancel order A1, I ordered it by mistake."
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_487DzK5SL35YaB8ftWZVvbhP"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"A1\"}"
+         }
+        },
+        {
+         "key": "llm.input_messages.3.message.role",
+         "value": {
+          "stringValue": "tool"
+         }
+        },
+        {
+         "key": "llm.input_messages.3.message.content",
+         "value": {
+          "stringValue": "{\"error\": \"lookup service unavailable\"}"
+         }
+        },
+        {
+         "key": "llm.input_messages.4.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.input_messages.4.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_4O6kP2LFRUIdvka8HzxbJQb1"
+         }
+        },
+        {
+         "key": "llm.input_messages.4.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "llm.input_messages.4.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"A1\"}"
+         }
+        },
+        {
+         "key": "llm.input_messages.5.message.role",
+         "value": {
+          "stringValue": "tool"
+         }
+        },
+        {
+         "key": "llm.input_messages.5.message.content",
+         "value": {
+          "stringValue": "{\"error\": \"lookup service unavailable\"}"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please cancel order A1, I ordered it by mistake.\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_487DzK5SL35YaB8ftWZVvbhP\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_487DzK5SL35YaB8ftWZVvbhP\", \"content\": \"{\\\"error\\\": \\\"lookup service unavailable\\\"}\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_4O6kP2LFRUIdvka8HzxbJQb1\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_4O6kP2LFRUIdvka8HzxbJQb1\", \"content\": \"{\\\"error\\\": \\\"lookup service unavailable\\\"}\"}]}"
+         }
+        },
+        {
+         "key": "input.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.invocation_parameters",
+         "value": {
+          "stringValue": "{\"model\": \"openai/openai/gpt-6-luna\", \"api_base\": \"https://aicredits.in/v1\", \"tools\": [{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}]}"
+         }
+        },
+        {
+         "key": "llm.tools.0.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.1.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.2.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "I\u2019m sorry, but I couldn\u2019t access the order lookup service, so I wasn\u2019t able to verify or cancel order A1. Please try again later or contact support for help."
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.content",
+         "value": {
+          "stringValue": "I\u2019m sorry, but I couldn\u2019t access the order lookup service, so I wasn\u2019t able to verify or cancel order A1. Please try again later or contact support for help."
+         }
+        },
+        {
+         "key": "llm.finish_reason",
+         "value": {
+          "stringValue": "stop"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt",
+         "value": {
+          "intValue": "206"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt_details.cache_read",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.completion",
+         "value": {
+          "intValue": "63"
+         }
+        },
+        {
+         "key": "llm.token_count.completion_details.reasoning",
+         "value": {
+          "intValue": "20"
+         }
+        },
+        {
+         "key": "llm.token_count.total",
+         "value": {
+          "intValue": "269"
+         }
+        },
+        {
+         "key": "llm.cost.total",
+         "value": {
+          "doubleValue": 5.209999999999999e-05
+         }
+        },
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        }
+       ],
+       "parentSpanId": "adad8f78d002d1cb"
+      },
+      {
+       "traceId": "8128ef7f02379dbe1a6329694b28903a",
+       "spanId": "adad8f78d002d1cb",
+       "name": "support_agent",
+       "startTimeUnixNano": "1792837309936051400",
+       "endTimeUnixNano": "1792837315650522900",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "AGENT"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "Please cancel order A1, I ordered it by mistake."
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "I\u2019m sorry, but I couldn\u2019t access the order lookup service, so I wasn\u2019t able to verify or cancel order A1. Please try again later or contact support for help."
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

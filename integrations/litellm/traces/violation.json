@@ -1,0 +1,695 @@
+{
+ "resourceSpans": [
+  {
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "1d2ad4937bf47cb26cbb3c5d5cab9208",
+       "spanId": "2b0532136f2113bd",
+       "name": "completion",
+       "startTimeUnixNano": "1792837315655075900",
+       "endTimeUnixNano": "1792837317101594200",
+       "attributes": [
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "openai/openai/gpt-6-luna"
+         }
+        },
+        {
+         "key": "llm.provider",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.role",
+         "value": {
+          "stringValue": "system"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.content",
+         "value": {
+          "stringValue": "You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it."
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.role",
+         "value": {
+          "stringValue": "user"
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.content",
+         "value": {
+          "stringValue": "Please refund 900 on order B2."
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please refund 900 on order B2.\"}]}"
+         }
+        },
+        {
+         "key": "input.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.invocation_parameters",
+         "value": {
+          "stringValue": "{\"model\": \"openai/openai/gpt-6-luna\", \"api_base\": \"https://aicredits.in/v1\", \"tools\": [{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}]}"
+         }
+        },
+        {
+         "key": "llm.tools.0.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.1.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.2.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"id\":\"resp_05b1cbf51ab472ce016adc86c4060087d29fe774c5356e43cc\",\"created\":1792837316,\"model\":\"gpt-6-luna\",\"object\":\"chat.completion\",\"system_fingerprint\":null,\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"order_id\\\":\\\"B2\\\"}\",\"name\":\"lookup_order\"},\"id\":\"call_uPLNHHWnnEJaXIApuq0CiR21\",\"type\":\"function\"}],\"function_call\":null,\"provider_specific_fields\":{\"refusal\":null}},\"provider_specific_fields\":{}}],\"usage\":{\"completion_tokens\":20,\"prompt_tokens\":125,\"total_tokens\":145,\"completion_tokens_details\":{\"accepted_prediction_tokens\":null,\"audio_tokens\":null,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":null,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null},\"prompt_tokens_details\":{\"audio_tokens\":null,\"cache_write_tokens\":0,\"cached_tokens\":0,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null,\"cache_creation_tokens\":0},\"cost\":0.00254032543116,\"cost_details\":{\"completion_cost_inr\":0.0011290335249600002,\"prompt_cost_inr\":0.0014112919062000003},\"latency_ms\":1180},\"moderation\":null,\"service_tier\":null}"
+         }
+        },
+        {
+         "key": "output.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_uPLNHHWnnEJaXIApuq0CiR21"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"B2\"}"
+         }
+        },
+        {
+         "key": "llm.finish_reason",
+         "value": {
+          "stringValue": "tool_calls"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt",
+         "value": {
+          "intValue": "125"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt_details.cache_read",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.completion",
+         "value": {
+          "intValue": "20"
+         }
+        },
+        {
+         "key": "llm.token_count.completion_details.reasoning",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.total",
+         "value": {
+          "intValue": "145"
+         }
+        },
+        {
+         "key": "llm.cost.total",
+         "value": {
+          "doubleValue": 2.2499999999999998e-05
+         }
+        },
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        }
+       ],
+       "parentSpanId": "5e511e7f11a36836"
+      },
+      {
+       "traceId": "1d2ad4937bf47cb26cbb3c5d5cab9208",
+       "spanId": "0ded179c7773baba",
+       "name": "lookup_order",
+       "startTimeUnixNano": "1792837317101732400",
+       "endTimeUnixNano": "1792837317101788600",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "TOOL"
+         }
+        },
+        {
+         "key": "tool.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"order_id\": \"B2\"}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"order_id\": \"B2\", \"status\": \"delivered\", \"customer_id\": \"C2\", \"price\": 900}"
+         }
+        }
+       ],
+       "parentSpanId": "5e511e7f11a36836"
+      },
+      {
+       "traceId": "1d2ad4937bf47cb26cbb3c5d5cab9208",
+       "spanId": "d3cf5bec33e203bd",
+       "name": "completion",
+       "startTimeUnixNano": "1792837317101917400",
+       "endTimeUnixNano": "1792837319269411100",
+       "attributes": [
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "openai/openai/gpt-6-luna"
+         }
+        },
+        {
+         "key": "llm.provider",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.role",
+         "value": {
+          "stringValue": "system"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.content",
+         "value": {
+          "stringValue": "You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it."
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.role",
+         "value": {
+          "stringValue": "user"
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.content",
+         "value": {
+          "stringValue": "Please refund 900 on order B2."
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_uPLNHHWnnEJaXIApuq0CiR21"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"B2\"}"
+         }
+        },
+        {
+         "key": "llm.input_messages.3.message.role",
+         "value": {
+          "stringValue": "tool"
+         }
+        },
+        {
+         "key": "llm.input_messages.3.message.content",
+         "value": {
+          "stringValue": "{\"order_id\": \"B2\", \"status\": \"delivered\", \"customer_id\": \"C2\", \"price\": 900}"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please refund 900 on order B2.\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"B2\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_uPLNHHWnnEJaXIApuq0CiR21\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_uPLNHHWnnEJaXIApuq0CiR21\", \"content\": \"{\\\"order_id\\\": \\\"B2\\\", \\\"status\\\": \\\"delivered\\\", \\\"customer_id\\\": \\\"C2\\\", \\\"price\\\": 900}\"}]}"
+         }
+        },
+        {
+         "key": "input.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.invocation_parameters",
+         "value": {
+          "stringValue": "{\"model\": \"openai/openai/gpt-6-luna\", \"api_base\": \"https://aicredits.in/v1\", \"tools\": [{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}]}"
+         }
+        },
+        {
+         "key": "llm.tools.0.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.1.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.2.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"id\":\"resp_0e8c92fa251e2c6b016adc86c5c5c087d2beb9c3e85fbb0347\",\"created\":1792837317,\"model\":\"gpt-6-luna\",\"object\":\"chat.completion\",\"system_fingerprint\":null,\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"order_id\\\":\\\"B2\\\",\\\"amount\\\":900}\",\"name\":\"issue_refund\"},\"id\":\"call_lVagtjLHyES1eIWQQPIw1QzF\",\"type\":\"function\"}],\"function_call\":null,\"provider_specific_fields\":{\"refusal\":null}},\"provider_specific_fields\":{}}],\"usage\":{\"completion_tokens\":25,\"prompt_tokens\":185,\"total_tokens\":210,\"completion_tokens_details\":{\"accepted_prediction_tokens\":null,\"audio_tokens\":null,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":null,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null},\"prompt_tokens_details\":{\"audio_tokens\":null,\"cache_write_tokens\":0,\"cached_tokens\":0,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null,\"cache_creation_tokens\":0},\"cost\":0.003500003927376001,\"cost_details\":{\"completion_cost_inr\":0.0014112919062,\"prompt_cost_inr\":0.002088712021176},\"latency_ms\":1900},\"moderation\":null,\"service_tier\":null}"
+         }
+        },
+        {
+         "key": "output.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_lVagtjLHyES1eIWQQPIw1QzF"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "issue_refund"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"B2\",\"amount\":900}"
+         }
+        },
+        {
+         "key": "llm.finish_reason",
+         "value": {
+          "stringValue": "tool_calls"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt",
+         "value": {
+          "intValue": "185"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt_details.cache_read",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.completion",
+         "value": {
+          "intValue": "25"
+         }
+        },
+        {
+         "key": "llm.token_count.completion_details.reasoning",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.total",
+         "value": {
+          "intValue": "210"
+         }
+        },
+        {
+         "key": "llm.cost.total",
+         "value": {
+          "doubleValue": 3.0999999999999995e-05
+         }
+        },
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        }
+       ],
+       "parentSpanId": "5e511e7f11a36836"
+      },
+      {
+       "traceId": "1d2ad4937bf47cb26cbb3c5d5cab9208",
+       "spanId": "7768fca5cf392438",
+       "name": "issue_refund",
+       "startTimeUnixNano": "1792837319269480500",
+       "endTimeUnixNano": "1792837319269502000",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "TOOL"
+         }
+        },
+        {
+         "key": "tool.name",
+         "value": {
+          "stringValue": "issue_refund"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"order_id\": \"B2\", \"amount\": 900}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"order_id\": \"B2\", \"refunded\": 900}"
+         }
+        }
+       ],
+       "parentSpanId": "5e511e7f11a36836"
+      },
+      {
+       "traceId": "1d2ad4937bf47cb26cbb3c5d5cab9208",
+       "spanId": "6116a8af2d883dd7",
+       "name": "completion",
+       "startTimeUnixNano": "1792837319269556700",
+       "endTimeUnixNano": "1792837320738993900",
+       "attributes": [
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "openai/openai/gpt-6-luna"
+         }
+        },
+        {
+         "key": "llm.provider",
+         "value": {
+          "stringValue": "openai"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.role",
+         "value": {
+          "stringValue": "system"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.content",
+         "value": {
+          "stringValue": "You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it."
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.role",
+         "value": {
+          "stringValue": "user"
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.content",
+         "value": {
+          "stringValue": "Please refund 900 on order B2."
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_uPLNHHWnnEJaXIApuq0CiR21"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "lookup_order"
+         }
+        },
+        {
+         "key": "llm.input_messages.2.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"B2\"}"
+         }
+        },
+        {
+         "key": "llm.input_messages.3.message.role",
+         "value": {
+          "stringValue": "tool"
+         }
+        },
+        {
+         "key": "llm.input_messages.3.message.content",
+         "value": {
+          "stringValue": "{\"order_id\": \"B2\", \"status\": \"delivered\", \"customer_id\": \"C2\", \"price\": 900}"
+         }
+        },
+        {
+         "key": "llm.input_messages.4.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.input_messages.4.message.tool_calls.0.tool_call.id",
+         "value": {
+          "stringValue": "call_lVagtjLHyES1eIWQQPIw1QzF"
+         }
+        },
+        {
+         "key": "llm.input_messages.4.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "issue_refund"
+         }
+        },
+        {
+         "key": "llm.input_messages.4.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\":\"B2\",\"amount\":900}"
+         }
+        },
+        {
+         "key": "llm.input_messages.5.message.role",
+         "value": {
+          "stringValue": "tool"
+         }
+        },
+        {
+         "key": "llm.input_messages.5.message.content",
+         "value": {
+          "stringValue": "{\"order_id\": \"B2\", \"refunded\": 900}"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please refund 900 on order B2.\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"B2\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_uPLNHHWnnEJaXIApuq0CiR21\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_uPLNHHWnnEJaXIApuq0CiR21\", \"content\": \"{\\\"order_id\\\": \\\"B2\\\", \\\"status\\\": \\\"delivered\\\", \\\"customer_id\\\": \\\"C2\\\", \\\"price\\\": 900}\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"B2\\\",\\\"amount\\\":900}\", \"name\": \"issue_refund\"}, \"id\": \"call_lVagtjLHyES1eIWQQPIw1QzF\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_lVagtjLHyES1eIWQQPIw1QzF\", \"content\": \"{\\\"order_id\\\": \\\"B2\\\", \\\"refunded\\\": 900}\"}]}"
+         }
+        },
+        {
+         "key": "input.mime_type",
+         "value": {
+          "stringValue": "application/json"
+         }
+        },
+        {
+         "key": "llm.invocation_parameters",
+         "value": {
+          "stringValue": "{\"model\": \"openai/openai/gpt-6-luna\", \"api_base\": \"https://aicredits.in/v1\", \"tools\": [{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}, {\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}]}"
+         }
+        },
+        {
+         "key": "llm.tools.0.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"lookup_order\", \"description\": \"Look up an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}}, \"required\": [\"order_id\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.1.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"cancel_order\", \"description\": \"Cancel an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"reason\": {\"type\": \"string\"}}, \"required\": [\"order_id\", \"reason\"]}}}"
+         }
+        },
+        {
+         "key": "llm.tools.2.tool.json_schema",
+         "value": {
+          "stringValue": "{\"type\": \"function\", \"function\": {\"name\": \"issue_refund\", \"description\": \"Refund an order.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"order_id\": {\"type\": \"string\"}, \"amount\": {\"type\": \"number\"}}, \"required\": [\"order_id\", \"amount\"]}}}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "I refunded 900 on order B2."
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.content",
+         "value": {
+          "stringValue": "I refunded 900 on order B2."
+         }
+        },
+        {
+         "key": "llm.finish_reason",
+         "value": {
+          "stringValue": "stop"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt",
+         "value": {
+          "intValue": "237"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt_details.cache_read",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.completion",
+         "value": {
+          "intValue": "13"
+         }
+        },
+        {
+         "key": "llm.token_count.completion_details.reasoning",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "llm.token_count.total",
+         "value": {
+          "intValue": "250"
+         }
+        },
+        {
+         "key": "llm.cost.total",
+         "value": {
+          "doubleValue": 3.02e-05
+         }
+        },
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        }
+       ],
+       "parentSpanId": "5e511e7f11a36836"
+      },
+      {
+       "traceId": "1d2ad4937bf47cb26cbb3c5d5cab9208",
+       "spanId": "5e511e7f11a36836",
+       "name": "support_agent",
+       "startTimeUnixNano": "1792837315654916200",
+       "endTimeUnixNano": "1792837320739033400",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "AGENT"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "Please refund 900 on order B2."
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "I refunded 900 on order B2."
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

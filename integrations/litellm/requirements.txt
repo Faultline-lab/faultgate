@@ -1,3 +1,5 @@
 litellm==1.106.2
 openinference-instrumentation-litellm==0.1.50
 opentelemetry-sdk==1.45.1
+pip freeze | Select-String "^mcp==" | Add-Content 
+integrations\litellm\requirements.txt
