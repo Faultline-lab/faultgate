@@ -145,13 +145,12 @@ Each `check` also prints three `note: ... skipped` lines (checks that need a jud
 
 
 ```
-
 $ faultgate precheck traces/clean.json --sample 0
 precheck: OK · format openinference · checked 1 of 1 traces · 2 tool steps read · 0 error(s), 0 warning(s)
 $ faultgate check traces/clean.json --policy policy.json
 trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
 ------------------------------------------------------------------------------------------------------------------------------
-44b744138dfb  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00       
+d98cecb31e01  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00       
 
 0/1 traces failed · search_loop=0, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
 (exit code: 0)
@@ -161,7 +160,7 @@ precheck: OK · format openinference · checked 1 of 1 traces · 2 tool steps re
 $ faultgate check traces/faulty.json --policy policy.json
 trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
 ------------------------------------------------------------------------------------------------------------------------------
-8128ef7f0237  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00       
+897f0d95e2a7  ok   1.00         ok   1.00         ok   1.00         ok   1.00         FAIL 1.00         ok   1.00       
 
 1/1 traces failed · search_loop=0, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=1, context_overflow=0 · judge none · 0.0s
 (exit code: 1)
@@ -171,11 +170,10 @@ precheck: OK · format openinference · checked 1 of 1 traces · 2 tool steps re
 $ faultgate check traces/violation.json --policy policy.json
 trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
 ------------------------------------------------------------------------------------------------------------------------------
-1d2ad4937bf4  ok   1.00         ok   1.00         FAIL 1.00         ok   1.00         ok   1.00         ok   1.00       
+a04f1ac1bc7e  ok   1.00         ok   1.00         FAIL 1.00         ok   1.00         ok   1.00         ok   1.00       
 
 1/1 traces failed · search_loop=0, abstention=0, policy=1, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
 (exit code: 1)
-
 ```
 
 
@@ -217,6 +215,7 @@ openinference. The traces use `openinference.span.kind` attributes, and faultgat
 - Model: openai/gpt-6-luna, run on 2026-10-24
 
 - DeepSeek (deepseek/deepseek-v4.1-flash-1017): clean exit 0, violation exit 1 with `policy`, faulty exit 1 with `unrecovered_tool_error` and also `abstention`.
+
 
 
 
