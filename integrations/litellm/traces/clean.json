@@ -5,11 +5,11 @@
     {
      "spans": [
       {
-       "traceId": "44b744138dfbe20df79aa64bd005dcec",
-       "spanId": "142c84a9ff6bedb4",
+       "traceId": "d98cecb31e017b1024a8b320b1bdebe9",
+       "spanId": "873c48952588e616",
        "name": "completion",
-       "startTimeUnixNano": "1792837302875752300",
-       "endTimeUnixNano": "1792837306487492900",
+       "startTimeUnixNano": "1792854767649322300",
+       "endTimeUnixNano": "1792854772396827000",
        "attributes": [
         {
          "key": "llm.model_name",
@@ -86,7 +86,7 @@
         {
          "key": "output.value",
          "value": {
-          "stringValue": "{\"id\":\"resp_0aeb6f9dd787fbd4016adc86b93d5887d2a39512085d6883df\",\"created\":1792837305,\"model\":\"gpt-6-luna\",\"object\":\"chat.completion\",\"system_fingerprint\":null,\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"order_id\\\":\\\"A1\\\"}\",\"name\":\"lookup_order\"},\"id\":\"call_3vAMPr7sxGlFai0jWTsJWiO9\",\"type\":\"function\"}],\"function_call\":null,\"provider_specific_fields\":{\"refusal\":null}},\"provider_specific_fields\":{}}],\"usage\":{\"completion_tokens\":20,\"prompt_tokens\":128,\"total_tokens\":148,\"completion_tokens_details\":{\"accepted_prediction_tokens\":null,\"audio_tokens\":null,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":null,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null},\"prompt_tokens_details\":{\"audio_tokens\":null,\"cache_write_tokens\":0,\"cached_tokens\":0,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null,\"cache_creation_tokens\":0},\"cost\":0.0025741964369088,\"cost_details\":{\"completion_cost_inr\":0.0011290335249600002,\"prompt_cost_inr\":0.0014451629119488004},\"latency_ms\":1321},\"moderation\":null,\"service_tier\":null}"
+          "stringValue": "{\"id\":\"resp_0393c181de4b7d16016adccaf32b9487d29e3314ce1a6ecdca\",\"created\":1792854771,\"model\":\"gpt-6-luna\",\"object\":\"chat.completion\",\"system_fingerprint\":null,\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"order_id\\\":\\\"A1\\\"}\",\"name\":\"lookup_order\"},\"id\":\"call_zxO8T87E3de4sKJFC7zfASDM\",\"type\":\"function\"}],\"function_call\":null,\"provider_specific_fields\":{\"refusal\":null}},\"provider_specific_fields\":{}}],\"usage\":{\"completion_tokens\":20,\"prompt_tokens\":128,\"total_tokens\":148,\"completion_tokens_details\":{\"accepted_prediction_tokens\":null,\"audio_tokens\":null,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":null,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null},\"prompt_tokens_details\":{\"audio_tokens\":null,\"cache_write_tokens\":0,\"cached_tokens\":0,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null,\"cache_creation_tokens\":0},\"cost\":0.0025741964369088,\"cost_details\":{\"completion_cost_inr\":0.0011290335249600002,\"prompt_cost_inr\":0.0014451629119488004},\"latency_ms\":1377},\"moderation\":null,\"service_tier\":null}"
          }
         },
         {
@@ -104,7 +104,7 @@
         {
          "key": "llm.output_messages.0.message.tool_calls.0.tool_call.id",
          "value": {
-          "stringValue": "call_3vAMPr7sxGlFai0jWTsJWiO9"
+          "stringValue": "call_zxO8T87E3de4sKJFC7zfASDM"
          }
         },
         {
@@ -168,14 +168,14 @@
          }
         }
        ],
-       "parentSpanId": "ce45638a98e03c5b"
+       "parentSpanId": "04a702de979507f4"
       },
       {
-       "traceId": "44b744138dfbe20df79aa64bd005dcec",
-       "spanId": "3871bba80645e492",
+       "traceId": "d98cecb31e017b1024a8b320b1bdebe9",
+       "spanId": "f28e1f2aea9b82c9",
        "name": "lookup_order",
-       "startTimeUnixNano": "1792837306487575300",
-       "endTimeUnixNano": "1792837306487603800",
+       "startTimeUnixNano": "1792854772397048500",
+       "endTimeUnixNano": "1792854772397131900",
        "attributes": [
         {
          "key": "openinference.span.kind",
@@ -202,14 +202,14 @@
          }
         }
        ],
-       "parentSpanId": "ce45638a98e03c5b"
+       "parentSpanId": "04a702de979507f4"
       },
       {
-       "traceId": "44b744138dfbe20df79aa64bd005dcec",
-       "spanId": "ed5487f15945c33c",
+       "traceId": "d98cecb31e017b1024a8b320b1bdebe9",
+       "spanId": "01500f6ec62a20a7",
        "name": "completion",
-       "startTimeUnixNano": "1792837306487665200",
-       "endTimeUnixNano": "1792837308353416300",
+       "startTimeUnixNano": "1792854772397319200",
+       "endTimeUnixNano": "1792854774732815400",
        "attributes": [
         {
          "key": "llm.model_name",
@@ -256,7 +256,7 @@
         {
          "key": "llm.input_messages.2.message.tool_calls.0.tool_call.id",
          "value": {
-          "stringValue": "call_3vAMPr7sxGlFai0jWTsJWiO9"
+          "stringValue": "call_zxO8T87E3de4sKJFC7zfASDM"
          }
         },
         {
@@ -286,7 +286,7 @@
         {
          "key": "input.value",
          "value": {
-          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please cancel order A1, I ordered it by mistake.\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_3vAMPr7sxGlFai0jWTsJWiO9\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_3vAMPr7sxGlFai0jWTsJWiO9\", \"content\": \"{\\\"order_id\\\": \\\"A1\\\", \\\"status\\\": \\\"pending\\\", \\\"customer_id\\\": \\\"C1\\\", \\\"price\\\": 300}\"}]}"
+          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please cancel order A1, I ordered it by mistake.\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_zxO8T87E3de4sKJFC7zfASDM\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_zxO8T87E3de4sKJFC7zfASDM\", \"content\": \"{\\\"order_id\\\": \\\"A1\\\", \\\"status\\\": \\\"pending\\\", \\\"customer_id\\\": \\\"C1\\\", \\\"price\\\": 300}\"}]}"
          }
         },
         {
@@ -322,7 +322,7 @@
         {
          "key": "output.value",
          "value": {
-          "stringValue": "{\"id\":\"resp_01a432b0c566ec91016adc86bb1ea087d2b0f4dde82b404295\",\"created\":1792837307,\"model\":\"gpt-6-luna\",\"object\":\"chat.completion\",\"system_fingerprint\":null,\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"order_id\\\":\\\"A1\\\",\\\"reason\\\":\\\"Ordered by mistake\\\"}\",\"name\":\"cancel_order\"},\"id\":\"call_28fwsmLcEK4L76ERBjRdN37B\",\"type\":\"function\"}],\"function_call\":null,\"provider_specific_fields\":{\"refusal\":null}},\"provider_specific_fields\":{}}],\"usage\":{\"completion_tokens\":26,\"prompt_tokens\":187,\"total_tokens\":213,\"completion_tokens_details\":{\"accepted_prediction_tokens\":null,\"audio_tokens\":null,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":null,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null},\"prompt_tokens_details\":{\"audio_tokens\":null,\"cache_write_tokens\":0,\"cached_tokens\":0,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null,\"cache_creation_tokens\":0},\"cost\":0.0035790362741231997,\"cost_details\":{\"completion_cost_inr\":0.0014677435824479999,\"prompt_cost_inr\":0.0021112926916752005},\"latency_ms\":1598},\"moderation\":null,\"service_tier\":null}"
+          "stringValue": "{\"id\":\"resp_0e79c2ae25b66429016adccaf4f27c87d28d27c865d03f8f52\",\"created\":1792854772,\"model\":\"gpt-6-luna\",\"object\":\"chat.completion\",\"system_fingerprint\":null,\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"order_id\\\":\\\"A1\\\",\\\"reason\\\":\\\"Ordered by mistake\\\"}\",\"name\":\"cancel_order\"},\"id\":\"call_Gr3FTWT7I8OzNO34Ztv1jws5\",\"type\":\"function\"}],\"function_call\":null,\"provider_specific_fields\":{\"refusal\":null}},\"provider_specific_fields\":{}}],\"usage\":{\"completion_tokens\":26,\"prompt_tokens\":187,\"total_tokens\":213,\"completion_tokens_details\":{\"accepted_prediction_tokens\":null,\"audio_tokens\":null,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":null,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null},\"prompt_tokens_details\":{\"audio_tokens\":null,\"cache_write_tokens\":0,\"cached_tokens\":0,\"text_tokens\":null,\"image_tokens\":null,\"video_tokens\":null,\"cache_creation_tokens\":0},\"cost\":0.0035790362741231997,\"cost_details\":{\"completion_cost_inr\":0.0014677435824479999,\"prompt_cost_inr\":0.0021112926916752005},\"latency_ms\":2204},\"moderation\":null,\"service_tier\":null}"
          }
         },
         {
@@ -340,7 +340,7 @@
         {
          "key": "llm.output_messages.0.message.tool_calls.0.tool_call.id",
          "value": {
-          "stringValue": "call_28fwsmLcEK4L76ERBjRdN37B"
+          "stringValue": "call_Gr3FTWT7I8OzNO34Ztv1jws5"
          }
         },
         {
@@ -404,14 +404,14 @@
          }
         }
        ],
-       "parentSpanId": "ce45638a98e03c5b"
+       "parentSpanId": "04a702de979507f4"
       },
       {
-       "traceId": "44b744138dfbe20df79aa64bd005dcec",
-       "spanId": "d99f6ce1d0e07e49",
+       "traceId": "d98cecb31e017b1024a8b320b1bdebe9",
+       "spanId": "2df534f9d25c8d6c",
        "name": "cancel_order",
-       "startTimeUnixNano": "1792837308353576400",
-       "endTimeUnixNano": "1792837308353630000",
+       "startTimeUnixNano": "1792854774732973300",
+       "endTimeUnixNano": "1792854774733032600",
        "attributes": [
         {
          "key": "openinference.span.kind",
@@ -438,14 +438,14 @@
          }
         }
        ],
-       "parentSpanId": "ce45638a98e03c5b"
+       "parentSpanId": "04a702de979507f4"
       },
       {
-       "traceId": "44b744138dfbe20df79aa64bd005dcec",
-       "spanId": "8437c888646a5ca0",
+       "traceId": "d98cecb31e017b1024a8b320b1bdebe9",
+       "spanId": "e15e6ab2d2b906ae",
        "name": "completion",
-       "startTimeUnixNano": "1792837308353777700",
-       "endTimeUnixNano": "1792837309932645500",
+       "startTimeUnixNano": "1792854774733193300",
+       "endTimeUnixNano": "1792854776122710200",
        "attributes": [
         {
          "key": "llm.model_name",
@@ -492,7 +492,7 @@
         {
          "key": "llm.input_messages.2.message.tool_calls.0.tool_call.id",
          "value": {
-          "stringValue": "call_3vAMPr7sxGlFai0jWTsJWiO9"
+          "stringValue": "call_zxO8T87E3de4sKJFC7zfASDM"
          }
         },
         {
@@ -528,7 +528,7 @@
         {
          "key": "llm.input_messages.4.message.tool_calls.0.tool_call.id",
          "value": {
-          "stringValue": "call_28fwsmLcEK4L76ERBjRdN37B"
+          "stringValue": "call_Gr3FTWT7I8OzNO34Ztv1jws5"
          }
         },
         {
@@ -558,7 +558,7 @@
         {
          "key": "input.value",
          "value": {
-          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please cancel order A1, I ordered it by mistake.\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_3vAMPr7sxGlFai0jWTsJWiO9\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_3vAMPr7sxGlFai0jWTsJWiO9\", \"content\": \"{\\\"order_id\\\": \\\"A1\\\", \\\"status\\\": \\\"pending\\\", \\\"customer_id\\\": \\\"C1\\\", \\\"price\\\": 300}\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\",\\\"reason\\\":\\\"Ordered by mistake\\\"}\", \"name\": \"cancel_order\"}, \"id\": \"call_28fwsmLcEK4L76ERBjRdN37B\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_28fwsmLcEK4L76ERBjRdN37B\", \"content\": \"{\\\"order_id\\\": \\\"A1\\\", \\\"status\\\": \\\"cancelled\\\"}\"}]}"
+          "stringValue": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a customer support agent. Use the tools. Always look up an order before you cancel or refund it.\"}, {\"role\": \"user\", \"content\": \"Please cancel order A1, I ordered it by mistake.\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\"}\", \"name\": \"lookup_order\"}, \"id\": \"call_zxO8T87E3de4sKJFC7zfASDM\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_zxO8T87E3de4sKJFC7zfASDM\", \"content\": \"{\\\"order_id\\\": \\\"A1\\\", \\\"status\\\": \\\"pending\\\", \\\"customer_id\\\": \\\"C1\\\", \\\"price\\\": 300}\"}, {\"content\": null, \"role\": \"assistant\", \"tool_calls\": [{\"function\": {\"arguments\": \"{\\\"order_id\\\":\\\"A1\\\",\\\"reason\\\":\\\"Ordered by mistake\\\"}\", \"name\": \"cancel_order\"}, \"id\": \"call_Gr3FTWT7I8OzNO34Ztv1jws5\", \"type\": \"function\"}], \"function_call\": null, \"provider_specific_fields\": {\"refusal\": null}}, {\"role\": \"tool\", \"tool_call_id\": \"call_Gr3FTWT7I8OzNO34Ztv1jws5\", \"content\": \"{\\\"order_id\\\": \\\"A1\\\", \\\"status\\\": \\\"cancelled\\\"}\"}]}"
          }
         },
         {
@@ -594,7 +594,7 @@
         {
          "key": "output.value",
          "value": {
-          "stringValue": "Order A1 has been cancelled because it was ordered by mistake."
+          "stringValue": "Order A1 has been canceled because it was ordered by mistake."
          }
         },
         {
@@ -606,7 +606,7 @@
         {
          "key": "llm.output_messages.0.message.content",
          "value": {
-          "stringValue": "Order A1 has been cancelled because it was ordered by mistake."
+          "stringValue": "Order A1 has been canceled because it was ordered by mistake."
          }
         },
         {
@@ -658,14 +658,14 @@
          }
         }
        ],
-       "parentSpanId": "ce45638a98e03c5b"
+       "parentSpanId": "04a702de979507f4"
       },
       {
-       "traceId": "44b744138dfbe20df79aa64bd005dcec",
-       "spanId": "ce45638a98e03c5b",
+       "traceId": "d98cecb31e017b1024a8b320b1bdebe9",
+       "spanId": "04a702de979507f4",
        "name": "support_agent",
-       "startTimeUnixNano": "1792837302875677200",
-       "endTimeUnixNano": "1792837309932676200",
+       "startTimeUnixNano": "1792854767649154800",
+       "endTimeUnixNano": "1792854776122758300",
        "attributes": [
         {
          "key": "openinference.span.kind",
@@ -682,7 +682,7 @@
         {
          "key": "output.value",
          "value": {
-          "stringValue": "Order A1 has been cancelled because it was ordered by mistake."
+          "stringValue": "Order A1 has been canceled because it was ordered by mistake."
          }
         }
        ]
