@@ -51,6 +51,15 @@ The script records the `clean`, `faulty`, and `violation` scenarios in `traces/`
 `--scenario clean|faulty|violation|all`, `--runs N`, and `--output-dir DIR` for repeatable runs.
 The tested local Phoenix project received all three traces under `faultgate-phoenix`.
 
+Actual output from the run:
+
+```text
+$ python integrations/phoenix/agent.py --scenario all --output-dir integrations/phoenix/traces
+clean: 2 tool calls, 6 spans saved to integrations\phoenix\traces\clean.json
+faulty: 1 tool calls, 4 spans saved to integrations\phoenix\traces\faulty.json
+violation: 2 tool calls, 6 spans saved to integrations\phoenix\traces\violation.json
+```
+
 ## 6. Expected results
 
 | Trace | Exit code | Checks that fire |
@@ -74,6 +83,22 @@ faultgate check traces/violation.json --policy policy.json
 ```
 
 The saved traces are OpenInference JSON and can be checked without Phoenix or an API key.
+
+Key lines from the actual checks:
+
+```text
+$ faultgate precheck integrations/phoenix/traces/clean.json --sample 0
+precheck: OK · format openinference · checked 1 of 1 traces · 2 tool steps read · 0 error(s), 0 warning(s)
+
+$ faultgate check integrations/phoenix/traces/clean.json --policy integrations/phoenix/policy.json
+0/1 traces failed · search_loop=0, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
+
+$ faultgate check integrations/phoenix/traces/faulty.json --policy integrations/phoenix/policy.json
+1/1 traces failed · search_loop=0, abstention=1, policy=0, repeated_call=0, unrecovered_tool_error=1, context_overflow=0 · judge none · 0.0s
+
+$ faultgate check integrations/phoenix/traces/violation.json --policy integrations/phoenix/policy.json
+1/1 traces failed · search_loop=0, abstention=0, policy=1, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
+```
 
 ## 8. Problems I hit (gotchas)
 
