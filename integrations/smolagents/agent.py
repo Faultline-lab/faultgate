@@ -126,7 +126,6 @@ def run_agent(user_request, lookup=lookup_order, max_steps=8):
         1
         for step in agent.memory.steps
         for tc in (getattr(step, "tool_calls", None) or [])
-        if tc.name != "final_answer"
     )
     return answer, calls
 

@@ -240,3 +240,22 @@ Use `openinference`. The OpenInference smolagents instrumentation writes OpenInf
 
 - Date: 2026-10-25
 
+
+## 10. DeepSeek run
+
+
+Run the same scenarios with DeepSeek and save their traces separately:
+
+
+```powershell
+$env:MODEL = "deepseek/deepseek-v4.1-flash-1017"
+$env:TRACES_DIR = "traces_deepseek"
+python agent.py
+```
+
+
+These are real runs. `faultgate precheck --sample 0` read 3 / 2 / 3 tool steps from
+`clean.json`, `faulty.json`, and `violation.json`. The agent's printed calls also match at
+3 / 2 / 3. `faultgate check` returned exit codes 0 / 1 / 1; the faulty trace fired
+`unrecovered_tool_error`, and the violation trace fired `policy`.
+
