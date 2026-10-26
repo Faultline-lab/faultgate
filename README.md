@@ -2,7 +2,7 @@
 
 **A local-first release gate for AI agents.** Hand it the traces your agent recorded, it checks every run for known failure modes, measures your run-to-run noise, and exits non-zero only when a candidate is a real regression. Free, offline, no model required for the default checks.
 
-**Product and examples:** [FAULTLINE faultgate](https://faultline-labs.com/products/faultgate/) · **Documentation:** [faultgate docs](https://faultline-labs.com/docs/) · **PyPI:** [`faultgate`](https://pypi.org/project/faultgate/). Use faultgate to test recorded agent runs against business rules and measured baseline variation before a CI release.
+**Product and examples:** [FAULTLINE faultgate](https://www.faultline-labs.com/products/faultgate/) · **Documentation:** [faultgate docs](https://www.faultline-labs.com/docs/) · **PyPI:** [`faultgate`](https://pypi.org/project/faultgate/). Use faultgate to test recorded agent runs against business rules and measured baseline variation before a CI release.
 
 ```
 $ faultgate check examples/traces.json
