@@ -194,9 +194,10 @@ openinference. The traces use `openinference.span.kind` attributes, and faultgat
 
 2. `ModuleNotFoundError: No module named 'mcp'`. LiteLLM failed on its first model call. Fix: `pip install mcp`, and it is now pinned in `requirements.txt`.
 
-3. The faulty run fires `unrecovered_tool_error`, not `repeated_call`. The model gave up after 2 failed lookups, and `repeated_call` needs 3 or more identical calls. The task allows either check, so `expected.json` records the real result.
+3. The faulty run fires `unrecovered_tool_error`, not `repeated_call`. The DeepSeek trace has one failed lookup, and `repeated_call` needs 3 or more identical calls. The task allows either check, so `expected.json` records the real result.
 
-4. DeepSeek is not identical. The faulty run also fires `abstention` (see section 9).
+4. DeepSeek is not identical. Its faulty run fires both `abstention` and
+   `unrecovered_tool_error` (see section 9).
 
 
 
@@ -215,6 +216,38 @@ openinference. The traces use `openinference.span.kind` attributes, and faultgat
 - Model: openai/gpt-6-luna, run on 2026-10-24
 
 - DeepSeek (deepseek/deepseek-v4.1-flash-1017): clean exit 0, violation exit 1 with `policy`, faulty exit 1 with `unrecovered_tool_error` and also `abstention`.
+
+
+## 10. Build and check a baseline
+
+
+Three fresh clean runs were recorded with `openai/gpt-6-luna` in `traces_baseline/clean-1.json`,
+`clean-2.json`, and `clean-3.json`. Each had 2 tool calls and passed `faultgate precheck` with
+2 tool steps. The baseline command and result were:
+
+
+```powershell
+faultgate baseline `
+  traces_baseline/clean-1.json `
+  traces_baseline/clean-2.json `
+  traces_baseline/clean-3.json `
+  --policy policy.json --out band.json
+```
+
+
+```text
+band [1.00, 1.00] over 1 scenarios · 3 runs · 1 clean in every run · written to band.json
+```
+
+
+A fourth fresh clean run is saved at `traces_candidate/clean.json`. It passed the policy check
+and the baseline gate. The three-run baseline was also tested by the CLI using this fourth trace:
+
+
+```text
+precheck: OK · format openinference · checked 1 of 1 traces · 2 tool steps read · 0 error(s), 0 warning(s)
+gate: PASS · clean rate 1.00 vs band [1.00, 1.00] from 3 baseline runs · fail below -2.00 · p=1.000
+```
 
 
 
