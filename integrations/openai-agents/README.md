@@ -240,3 +240,22 @@ Use `openinference`. The OpenInference Agents instrumentation writes OpenInferen
 
 - Date: 2026-10-25
 
+
+## 10. DeepSeek run
+
+
+Run the same scenarios with DeepSeek and save their traces separately:
+
+
+```powershell
+$env:MODEL = "deepseek/deepseek-v4.1-flash-1017"
+$env:TRACES_DIR = "traces_deepseek"
+python agent.py
+```
+
+
+These are real runs. `agent.py` printed 2 / 2 / 2 tool calls, and `faultgate precheck --sample 0`
+read the same number of tool steps from `clean.json`, `faulty.json`, and `violation.json`.
+`faultgate check` returned exit codes 0 / 1 / 1; the faulty trace fired
+`unrecovered_tool_error`, and the violation trace fired `policy`.
+
