@@ -1,0 +1,3 @@
+note: wrong_direction skipped — it needs a judge (--judge laya | litellm:<model>); see README for each judge's measured κ
+note: wrong_answer skipped — it needs --golden golden.json (expected answers)
+note: truncation skipped — it needs --golden golden.json (expected answers)

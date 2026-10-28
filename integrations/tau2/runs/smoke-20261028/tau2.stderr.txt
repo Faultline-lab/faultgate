@@ -1,0 +1,1 @@
+[32m2026-10-28 11:34:26.256[0m | [34m[1mDEBUG   [0m | [36mtau2.registry[0m:[36m<module>[0m:[36m297[0m - [34m[1mVoice dependencies not installed, skipping voice user registration[0m

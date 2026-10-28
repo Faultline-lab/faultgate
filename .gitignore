@@ -3,6 +3,8 @@ CLAUDE.md
 .aes/started*
 .DS_Store
 .venv/
+.venv-tau2/
+.vendor/
 __pycache__/
 *.egg-info/
 .pytest_cache/

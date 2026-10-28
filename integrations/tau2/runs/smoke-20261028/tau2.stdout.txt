@@ -1,0 +1,117 @@
+┌───────────────────────── Simulation Configuration ──────────────────────────┐
+│ Domain: retail  Task Set: Default  Tasks: 17, 3                             │
+│ Trials: 1  Max Steps: 200  Max Errors: 10                                   │
+│                                                                             │
+│ Agent: llm_agent → openai/gpt-6-luna                                        │
+│ User:  user_simulator → openai/gpt-6-luna                                   │
+│                                                                             │
+│ Save: smoke-20261028  Concurrency: 3  Verbose: False                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+0/2 (trial 1/1). Running task 3, trial 1
+1/2 (trial 1/1). Running task 17, trial 1
+Status: 0/2 complete. Avg reward: N/A. 2 running: 3.0(30s), 17.0(30s)
+┌──────────────────────────── Simulation Overview ────────────────────────────┐
+│ Task ID: 17                                                                 │
+│ Trial: 0                                                                    │
+│ Duration: 40.04s                                                            │
+│ Mode: half_duplex                                                           │
+│ Termination Reason: TerminationReason.USER_STOP                             │
+│ User Cost: $0.0004                                                          │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                              │
+│                                                                             │
+│ DB Check:✅ 1.0                                                             │
+│                                                                             │
+│ Action Checks:                                                              │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                           │
+│ - 1: agent get_user_details [read] ❌ 0.0                                   │
+│ - 2: agent get_order_details [read] ❌ 0.0                                  │
+│ - 3: agent get_order_details [read] ✅ 1.0                                  │
+│ - 4: agent get_order_details [read] ❌ 0.0                                  │
+│ - 5: agent modify_pending_order_address [write] ✅ 1.0                      │
+│                                                                             │
+│ Partial Action Reward: 3/6 (50.0%)                                          │
+│   Read:  2/5 (40.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                       │
+│                                                                             │
+│ Additional Info:                                                            │
+│ env: None                                                                   │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                │
+│ communicate: None                                                           │
+│ action: None                                                                │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────── Simulation Overview ────────────────────────────┐
+│ Task ID: 3                                                                  │
+│ Trial: 0                                                                    │
+│ Duration: 55.24s                                                            │
+│ Mode: half_duplex                                                           │
+│ Termination Reason: TerminationReason.USER_STOP                             │
+│ User Cost: $0.0005                                                          │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                              │
+│                                                                             │
+│ DB Check:✅ 1.0                                                             │
+│                                                                             │
+│ Action Checks:                                                              │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                           │
+│ - 1: agent get_product_details [read] ❌ 0.0                                │
+│ - 2: agent get_product_details [read] ✅ 1.0                                │
+│ - 3: agent get_user_details [read] ✅ 1.0                                   │
+│ - 4: agent get_order_details [read] ✅ 1.0                                  │
+│ - 5: agent get_order_details [read] ✅ 1.0                                  │
+│ - 6: agent get_order_details [read] ✅ 1.0                                  │
+│ - 7: agent get_order_details [read] ✅ 1.0                                  │
+│ - 8: agent get_order_details [read] ✅ 1.0                                  │
+│ - 9: agent get_product_details [read] ✅ 1.0                                │
+│ - 10: agent get_user_details [read] ✅ 1.0                                  │
+│ - 11: agent modify_pending_order_items [write] ✅ 1.0                       │
+│                                                                             │
+│ Partial Action Reward: 11/12 (91.7%)                                        │
+│   Read:  10/11 (90.9%)                                                      │
+│   Write: 1/1 (100.0%)                                                       │
+│                                                                             │
+│ NL Assertions:                                                              │
+│ - 0: Agent should tell the user that there are 10 t-shirt options           │
+│ available. ✅                                                               │
+│         The agent explicitly stated, "There are 10 T-shirt variant options  │
+│ available right now," which directly satisfies the expected outcome.        │
+│                                                                             │
+│ Additional Info:                                                            │
+│ env: None                                                                   │
+│ nl: None                                                                    │
+│ communicate: None                                                           │
+│ action: None                                                                │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Successfully completed all simulations!
+To review the simulations, run: tau2 view
+┌───────────────────────── Agent Performance Metrics ─────────────────────────┐
+│   ═══ Overview ═══                                                          │
+│   Total Simulations         2                                               │
+│   Total Tasks               2                                               │
+│                                                                             │
+│   ═══ Reward Metrics ═══                                                    │
+│   🏆 Average Reward         1.0000                                          │
+│      Pass^1                 1.000                                           │
+│   💰 Avg Cost/Conversation  n/a                                             │
+│                                                                             │
+│   ═══ Action Metrics ═══                                                    │
+│   📖 Read Actions           12/16 (75.0%)                                   │
+│   ✏️  Write Actions         2/2 (100.0%)                                    │
+│                                                                             │
+│   ═══ DB Match ═══                                                          │
+│   🗄️  DB Match              ✓ 2 / ✗ 0 (100.0%)                              │
+│                                                                             │
+│   ═══ Authentication ═══                                                    │
+│      Not Checked            2                                               │
+│                                                                             │
+│   ═══ Termination ═══                                                       │
+│   🛑 Normal Stop            2 (👤 2 / 🤖 0)                                 │
+│                                                                             │
+│   ═══ LLM Judge Review ═══                                                  │
+│   🤖 Agent Errors           0 errors                                        │
+│      Sims by severity       -                                               │
+│   👤 User Errors            0 errors                                        │
+│      Sims by severity       -                                               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘

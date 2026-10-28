@@ -1,0 +1,29 @@
+{
+  "upstream_commit": "ebf990be93b594a08ed23cb8b7a9773cb9a03678",
+  "agent_model": "openai/gpt-6-luna",
+  "user_model": "openai/gpt-6-luna",
+  "tasks": [
+    {
+      "task_id": "17",
+      "tau2_reward": 1.0,
+      "agent_cost_usd": null,
+      "user_cost_usd": 0.0003698,
+      "duration_seconds": 40.03983780002454,
+      "tool_calls": 3
+    },
+    {
+      "task_id": "3",
+      "tau2_reward": 1.0,
+      "agent_cost_usd": null,
+      "user_cost_usd": 0.00046139999999999994,
+      "duration_seconds": 55.24470790004125,
+      "tool_calls": 10
+    }
+  ],
+  "recorded_known_agent_and_user_cost_usd": 0.0008311999999999999,
+  "tasks_with_unavailable_agent_cost": [
+    "17",
+    "3"
+  ],
+  "cost_note": "\u03c4-bench returned user_cost but agent_cost was null for both runs, so this is a lower bound, not total API spend. Post-hoc evaluator charges, if any, are not included."
+}

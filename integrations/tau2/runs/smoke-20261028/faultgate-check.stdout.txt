@@ -1,0 +1,7 @@
+trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
+------------------------------------------------------------------------------------------------------------------------------
+23c85925cebb  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+5aa145e4272c  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00
+
+0/2 traces failed · search_loop=0, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 · judge none · 0.0s
+report written to E:\faultgate-work\faultgate-tau2-retail\integrations\tau2\runs\smoke-20261028\faultgate-report.json

@@ -1,0 +1,24 @@
+{
+  "command": [
+    "E:\\faultgate-work\\faultgate-tau2-retail\\.venv-tau2\\Scripts\\tau2.exe",
+    "run",
+    "--domain",
+    "retail",
+    "--num-trials",
+    "1",
+    "--agent-llm",
+    "openai/gpt-6-luna",
+    "--user-llm",
+    "openai/gpt-6-luna",
+    "--task-ids",
+    "17",
+    "3",
+    "--save-to",
+    "smoke-20261028"
+  ],
+  "commit": "ebf990be93b594a08ed23cb8b7a9773cb9a03678",
+  "task_ids": [
+    "17",
+    "3"
+  ]
+}

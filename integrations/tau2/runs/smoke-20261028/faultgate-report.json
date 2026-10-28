@@ -1,0 +1,132 @@
+{
+ "judge": "none",
+ "checks": [
+  "search_loop",
+  "abstention",
+  "policy",
+  "repeated_call",
+  "unrecovered_tool_error",
+  "context_overflow"
+ ],
+ "redaction": "builtin",
+ "traces": 2,
+ "failed_traces": [],
+ "fired": {
+  "search_loop": 0,
+  "abstention": 0,
+  "policy": 0,
+  "repeated_call": 0,
+  "unrecovered_tool_error": 0,
+  "context_overflow": 0
+ },
+ "measures": {
+  "23c85925cebbb099e75f1fe24dc9b692": {
+   "tokens": null,
+   "latency_ms": 55244.06912,
+   "cost_usd": null
+  },
+  "5aa145e4272ca6953342fc0fe64d0172": {
+   "tokens": null,
+   "latency_ms": 40039.422208,
+   "cost_usd": null
+  }
+ },
+ "results": [
+  {
+   "trace_id": "23c85925cebbb099e75f1fe24dc9b692",
+   "scenario": "3",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "23c85925cebbb099e75f1fe24dc9b692",
+   "scenario": "3",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "23c85925cebbb099e75f1fe24dc9b692",
+   "scenario": "3",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "10 calls within policy"
+  },
+  {
+   "trace_id": "23c85925cebbb099e75f1fe24dc9b692",
+   "scenario": "3",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "23c85925cebbb099e75f1fe24dc9b692",
+   "scenario": "3",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "23c85925cebbb099e75f1fe24dc9b692",
+   "scenario": "3",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "5aa145e4272ca6953342fc0fe64d0172",
+   "scenario": "17",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "5aa145e4272ca6953342fc0fe64d0172",
+   "scenario": "17",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "5aa145e4272ca6953342fc0fe64d0172",
+   "scenario": "17",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "3 calls within policy"
+  },
+  {
+   "trace_id": "5aa145e4272ca6953342fc0fe64d0172",
+   "scenario": "17",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "5aa145e4272ca6953342fc0fe64d0172",
+   "scenario": "17",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "5aa145e4272ca6953342fc0fe64d0172",
+   "scenario": "17",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  }
+ ]
+}
