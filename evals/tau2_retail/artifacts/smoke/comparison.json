@@ -1,0 +1,16 @@
+[
+  {
+    "task_id": "0",
+    "tau2_reward": 1.0,
+    "tau2_pass": true,
+    "faultgate_pass": true,
+    "fired": []
+  },
+  {
+    "task_id": "16",
+    "tau2_reward": 1.0,
+    "tau2_pass": true,
+    "faultgate_pass": true,
+    "fired": []
+  }
+]

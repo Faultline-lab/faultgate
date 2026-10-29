@@ -1,0 +1,10 @@
+note: wrong_direction skipped - it needs a judge (--judge laya | litellm:<model>); see README for each judge's measured \u03ba
+note: wrong_answer skipped - it needs --golden golden.json (expected answers)
+note: truncation skipped - it needs --golden golden.json (expected answers)
+trace         search_loop       abstention        policy            repeated_call     unrecovered_tool_error  context_overflow
+------------------------------------------------------------------------------------------------------------------------------
+dea22d765390  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00       
+5ff059f89003  ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00         ok   1.00       
+0/2 traces failed - search_loop=0, abstention=0, policy=0, repeated_call=0, unrecovered_tool_error=0, context_overflow=0 - judge none - 0.0s
+report written to faultgate\evals\tau2_retail\artifacts\smoke\faultgate-report.json
+EXIT=0

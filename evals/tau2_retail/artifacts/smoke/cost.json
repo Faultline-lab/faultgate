@@ -1,0 +1,8 @@
+{
+  "calls": 35,
+  "prompt_tokens": 189276,
+  "completion_tokens": 8251,
+  "models": {
+    "openai/qwen3.8-flash": 35
+  }
+}
