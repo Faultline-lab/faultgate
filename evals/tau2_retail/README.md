@@ -112,6 +112,24 @@ faultgate check evals/tau2_retail/artifacts/smoke/traces.json \
 `check` exits 1 when a check fires and 2 on bad input. Capture `$?` if you
 need the exit code in CI.
 
+### Put τ-bench's outcome in the same report
+
+Faultgate can take your evaluator's per-scenario pass/fail with `--outcomes`
+and show it beside its own checks:
+
+```bash
+faultgate check evals/tau2_retail/artifacts/retail_50_first10/traces.json \
+  --policy examples/policy_retail.json \
+  --outcomes evals/tau2_retail/artifacts/retail_50_first10/outcomes.json \
+  --markdown evals/tau2_retail/artifacts/retail_50_first10/report-with-outcomes.md
+```
+
+`artifacts/retail_50_first10/outcomes.json` is derived from the run's
+`results.json` (`retail-<task id>` → `reward == 1.0`). The generated Markdown
+report is the PR/user-facing view: 9/10 outcomes true, 2/10 traces failed
+(one process check and one task outcome), with the failing trace IDs and a
+reproduce command.
+
 ## Cost
 
 `cost.json` records every model call and the prompt/completion token totals for

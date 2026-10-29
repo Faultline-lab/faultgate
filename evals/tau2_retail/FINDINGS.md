@@ -72,6 +72,8 @@ The first ten tasks of tau2's published `retail_50` stratified subset:
 
 tau2 passed 9 of 10 (mean reward 0.9); faultgate passed 9 of 10; the two
 systems agreed on 8 of 10. There is one disagreement in each direction.
+`report-with-outcomes.md` is the faultgate-generated user view with both
+signals in one table; `comparison.txt` is the external join used for review.
 
 ### Disagreement A: task 16, tau2 pass / faultgate FAIL
 
