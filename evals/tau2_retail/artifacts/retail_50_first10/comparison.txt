@@ -1,0 +1,16 @@
+task   tau2  faultgate  checks
+   6    1.0       pass  -
+   8    1.0       pass  -
+  11    1.0       pass  -
+  13    1.0       pass  -
+  14    1.0       pass  -
+  16    1.0       FAIL  unrecovered_tool_error
+  17    1.0       pass  -
+  18    0.0       pass  -
+  19    1.0       pass  -
+  21    1.0       pass  -
+agreement: 8/10
+tau2 pass / faultgate fail (false positive or process-only): 1
+  task 16: unrecovered_tool_error: Tool 'find_user_id_by_email' failed at step 1 (Response starts with 'Error:') and no subsequent call to 'find_user_id_by_email' succeeded.
+tau2 fail / faultgate pass (outside its checks): 1
+  task 18: reward=0.0

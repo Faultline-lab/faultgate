@@ -1,0 +1,6 @@
+task   tau2  faultgate  checks
+   0    1.0       pass  -
+  16    1.0       pass  -
+agreement: 2/2
+tau2 pass / faultgate fail (false positive or process-only): 0
+tau2 fail / faultgate pass (outside its checks): 0

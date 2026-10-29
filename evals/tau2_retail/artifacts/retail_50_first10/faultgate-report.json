@@ -1,0 +1,558 @@
+{
+ "judge": "none",
+ "checks": [
+  "search_loop",
+  "abstention",
+  "policy",
+  "repeated_call",
+  "unrecovered_tool_error",
+  "context_overflow"
+ ],
+ "redaction": "builtin",
+ "traces": 10,
+ "failed_traces": [
+  "974062dc7ad2621aad5ccf62fb2fdbb5"
+ ],
+ "fired": {
+  "search_loop": 0,
+  "abstention": 0,
+  "policy": 0,
+  "repeated_call": 0,
+  "unrecovered_tool_error": 1,
+  "context_overflow": 0
+ },
+ "measures": {
+  "7592bae12a21e1fe14af253509799dc8": {
+   "tokens": null,
+   "latency_ms": 95095.2393,
+   "cost_usd": null
+  },
+  "75d4fb0fe0a81159ccd8fd2403f9ad64": {
+   "tokens": null,
+   "latency_ms": 69182.6105,
+   "cost_usd": null
+  },
+  "8a8111108d8584d8da4bd8b339b5b472": {
+   "tokens": null,
+   "latency_ms": 81115.3182,
+   "cost_usd": null
+  },
+  "43211beff7212c051f344965f7f7d5ab": {
+   "tokens": null,
+   "latency_ms": 79867.7529,
+   "cost_usd": null
+  },
+  "67efaceb17c05707e695b6957208964a": {
+   "tokens": null,
+   "latency_ms": 64613.3713,
+   "cost_usd": null
+  },
+  "974062dc7ad2621aad5ccf62fb2fdbb5": {
+   "tokens": null,
+   "latency_ms": 67116.532,
+   "cost_usd": null
+  },
+  "f8cf6fd29a62065f7758d8579392c3ed": {
+   "tokens": null,
+   "latency_ms": 32781.9765,
+   "cost_usd": null
+  },
+  "e058f9be20d72c97aa15a745f024edee": {
+   "tokens": null,
+   "latency_ms": 45666.9216,
+   "cost_usd": null
+  },
+  "4cc6470c1816b795bd1b42e0f9e614af": {
+   "tokens": null,
+   "latency_ms": 71953.0619,
+   "cost_usd": null
+  },
+  "e3f1c31efa7fa8df34b49ddb215b6524": {
+   "tokens": null,
+   "latency_ms": 130528.5135,
+   "cost_usd": null
+  }
+ },
+ "results": [
+  {
+   "trace_id": "7592bae12a21e1fe14af253509799dc8",
+   "scenario": "retail-6",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "7592bae12a21e1fe14af253509799dc8",
+   "scenario": "retail-6",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "7592bae12a21e1fe14af253509799dc8",
+   "scenario": "retail-6",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "6 calls within policy"
+  },
+  {
+   "trace_id": "7592bae12a21e1fe14af253509799dc8",
+   "scenario": "retail-6",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "7592bae12a21e1fe14af253509799dc8",
+   "scenario": "retail-6",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "7592bae12a21e1fe14af253509799dc8",
+   "scenario": "retail-6",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "75d4fb0fe0a81159ccd8fd2403f9ad64",
+   "scenario": "retail-8",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "75d4fb0fe0a81159ccd8fd2403f9ad64",
+   "scenario": "retail-8",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "75d4fb0fe0a81159ccd8fd2403f9ad64",
+   "scenario": "retail-8",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "5 calls within policy"
+  },
+  {
+   "trace_id": "75d4fb0fe0a81159ccd8fd2403f9ad64",
+   "scenario": "retail-8",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "75d4fb0fe0a81159ccd8fd2403f9ad64",
+   "scenario": "retail-8",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "75d4fb0fe0a81159ccd8fd2403f9ad64",
+   "scenario": "retail-8",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "8a8111108d8584d8da4bd8b339b5b472",
+   "scenario": "retail-11",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "8a8111108d8584d8da4bd8b339b5b472",
+   "scenario": "retail-11",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "8a8111108d8584d8da4bd8b339b5b472",
+   "scenario": "retail-11",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "6 calls within policy"
+  },
+  {
+   "trace_id": "8a8111108d8584d8da4bd8b339b5b472",
+   "scenario": "retail-11",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "8a8111108d8584d8da4bd8b339b5b472",
+   "scenario": "retail-11",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "8a8111108d8584d8da4bd8b339b5b472",
+   "scenario": "retail-11",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "43211beff7212c051f344965f7f7d5ab",
+   "scenario": "retail-13",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "43211beff7212c051f344965f7f7d5ab",
+   "scenario": "retail-13",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "43211beff7212c051f344965f7f7d5ab",
+   "scenario": "retail-13",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "5 calls within policy"
+  },
+  {
+   "trace_id": "43211beff7212c051f344965f7f7d5ab",
+   "scenario": "retail-13",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "43211beff7212c051f344965f7f7d5ab",
+   "scenario": "retail-13",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "43211beff7212c051f344965f7f7d5ab",
+   "scenario": "retail-13",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "67efaceb17c05707e695b6957208964a",
+   "scenario": "retail-14",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "67efaceb17c05707e695b6957208964a",
+   "scenario": "retail-14",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "67efaceb17c05707e695b6957208964a",
+   "scenario": "retail-14",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "6 calls within policy"
+  },
+  {
+   "trace_id": "67efaceb17c05707e695b6957208964a",
+   "scenario": "retail-14",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "67efaceb17c05707e695b6957208964a",
+   "scenario": "retail-14",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "67efaceb17c05707e695b6957208964a",
+   "scenario": "retail-14",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "974062dc7ad2621aad5ccf62fb2fdbb5",
+   "scenario": "retail-16",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "974062dc7ad2621aad5ccf62fb2fdbb5",
+   "scenario": "retail-16",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "974062dc7ad2621aad5ccf62fb2fdbb5",
+   "scenario": "retail-16",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "9 calls within policy"
+  },
+  {
+   "trace_id": "974062dc7ad2621aad5ccf62fb2fdbb5",
+   "scenario": "retail-16",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "974062dc7ad2621aad5ccf62fb2fdbb5",
+   "scenario": "retail-16",
+   "check": "unrecovered_tool_error",
+   "detected": true,
+   "confidence": 1.0,
+   "reason": "Tool 'find_user_id_by_email' failed at step 1 (Response starts with 'Error:') and no subsequent call to 'find_user_id_by_email' succeeded."
+  },
+  {
+   "trace_id": "974062dc7ad2621aad5ccf62fb2fdbb5",
+   "scenario": "retail-16",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "f8cf6fd29a62065f7758d8579392c3ed",
+   "scenario": "retail-17",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "f8cf6fd29a62065f7758d8579392c3ed",
+   "scenario": "retail-17",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "f8cf6fd29a62065f7758d8579392c3ed",
+   "scenario": "retail-17",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "3 calls within policy"
+  },
+  {
+   "trace_id": "f8cf6fd29a62065f7758d8579392c3ed",
+   "scenario": "retail-17",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "f8cf6fd29a62065f7758d8579392c3ed",
+   "scenario": "retail-17",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "f8cf6fd29a62065f7758d8579392c3ed",
+   "scenario": "retail-17",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "e058f9be20d72c97aa15a745f024edee",
+   "scenario": "retail-18",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "e058f9be20d72c97aa15a745f024edee",
+   "scenario": "retail-18",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "e058f9be20d72c97aa15a745f024edee",
+   "scenario": "retail-18",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "5 calls within policy"
+  },
+  {
+   "trace_id": "e058f9be20d72c97aa15a745f024edee",
+   "scenario": "retail-18",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "e058f9be20d72c97aa15a745f024edee",
+   "scenario": "retail-18",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "e058f9be20d72c97aa15a745f024edee",
+   "scenario": "retail-18",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "4cc6470c1816b795bd1b42e0f9e614af",
+   "scenario": "retail-19",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "4cc6470c1816b795bd1b42e0f9e614af",
+   "scenario": "retail-19",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "4cc6470c1816b795bd1b42e0f9e614af",
+   "scenario": "retail-19",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "7 calls within policy"
+  },
+  {
+   "trace_id": "4cc6470c1816b795bd1b42e0f9e614af",
+   "scenario": "retail-19",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "4cc6470c1816b795bd1b42e0f9e614af",
+   "scenario": "retail-19",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "4cc6470c1816b795bd1b42e0f9e614af",
+   "scenario": "retail-19",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  },
+  {
+   "trace_id": "e3f1c31efa7fa8df34b49ddb215b6524",
+   "scenario": "retail-21",
+   "check": "search_loop",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answered"
+  },
+  {
+   "trace_id": "e3f1c31efa7fa8df34b49ddb215b6524",
+   "scenario": "retail-21",
+   "check": "abstention",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "answer does not abstain"
+  },
+  {
+   "trace_id": "e3f1c31efa7fa8df34b49ddb215b6524",
+   "scenario": "retail-21",
+   "check": "policy",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "12 calls within policy"
+  },
+  {
+   "trace_id": "e3f1c31efa7fa8df34b49ddb215b6524",
+   "scenario": "retail-21",
+   "check": "repeated_call",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no repeated calls without progress"
+  },
+  {
+   "trace_id": "e3f1c31efa7fa8df34b49ddb215b6524",
+   "scenario": "retail-21",
+   "check": "unrecovered_tool_error",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no unrecovered tool errors"
+  },
+  {
+   "trace_id": "e3f1c31efa7fa8df34b49ddb215b6524",
+   "scenario": "retail-21",
+   "check": "context_overflow",
+   "detected": false,
+   "confidence": 1.0,
+   "reason": "no context overflow or token cutoff"
+  }
+ ]
+}
