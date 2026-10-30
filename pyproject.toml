@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "faultgate"
-version = "0.4.1"
+version = "0.4.2"
 description = "FAULTLINE faultgate: open-source release gate for AI agents, trace checks, and regression decisions."
 readme = "README.md"
 license = "MIT"
