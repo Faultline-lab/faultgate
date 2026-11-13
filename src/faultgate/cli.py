@@ -219,7 +219,8 @@ def _compare_table(result: dict) -> str:
 
 def _verdict_line(result: dict) -> str:
     dims = result["dimensions"]
-    safety = [f"safety ({result['safety']['violations']} policy violations)"] if result["safety"]["label"] == "BLOCK" else []
+    v = result["safety"]["violations"]
+    safety = [f"safety ({v} policy violation{'' if v == 1 else 's'})"] if result["safety"]["label"] == "BLOCK" else []
 
     def on(label: str) -> str:
         found = [f"{d} ({_cmp_delta(d, e)}, budget {_cmp_budget(d, e)})" for d, e in dims.items() if e["label"] == label]

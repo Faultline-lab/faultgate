@@ -110,17 +110,22 @@ def _outcome_line(o: dict[str, Any], markdown: bool = False) -> str:
 ABSOLUTE_DIMS = {"correctness", "consistency"}  # change is a difference, not a ratio
 
 
+def _cmp_fmt(d: str, entry: dict[str, Any]) -> str:
+    """A relative dimension that fell back to absolute change prints a difference, not a percent."""
+    return "{:+.2f}" if d in ABSOLUTE_DIMS or "absolute change" in (entry["note"] or "") else "{:+.0%}"
+
+
 def _cmp_delta(d: str, entry: dict[str, Any]) -> str:
     if entry["delta"] is None:
         return "n/a"
-    return f"{entry['delta']:+.2f}" if d in ABSOLUTE_DIMS else f"{entry['delta']:+.0%}"
+    return _cmp_fmt(d, entry).format(entry["delta"])
 
 
 def _cmp_change(d: str, entry: dict[str, Any]) -> str:
     delta = _cmp_delta(d, entry)
     if entry["ci"] is None:
         return delta
-    fmt = "{:+.2f}" if d in ABSOLUTE_DIMS else "{:+.0%}"
+    fmt = _cmp_fmt(d, entry)
     lo, hi = entry["ci"]
     return f"{delta} [{fmt.format(lo)},{fmt.format(hi)}]"
 

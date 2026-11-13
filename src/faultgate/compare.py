@@ -287,6 +287,8 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
                     names = f": {', '.join(sorted(side['cost']['models']))}" if side["cost"]["models"] else ""
                     warnings.append(f"cost n/a: {other} is in USD, {bad} only has tokens; give --prices for the "
                                     f"{bad} model(s){names}")
+                else:
+                    warnings.append("cost n/a: missing on one side (every value is None), not gated")
             else:
                 warnings.append(f"{d} n/a: missing on one side (every value is None), not gated")
             if d == "speed":

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from faultgate import cli
-from tests.fixtures.make_compare_runs import POLICY, write_side
+from tests.fixtures.make_compare_runs import POLICY, make_run, write_side
 
 REPO = Path(__file__).resolve().parents[1]
 GATE = REPO / "examples" / "gate"
@@ -58,6 +58,31 @@ def test_policy_violation_blocks(tmp_path, capsys):
     assert code == 1
     assert _verdict(out).startswith("verdict: BLOCK · worse on safety")
     assert "policy violations" in out and "BLOCK" in out
+
+
+def test_verdict_line_says_one_policy_violation(tmp_path, capsys):
+    base = write_side(tmp_path, "base", runs=2)
+    cand = write_side(tmp_path, "cand", runs=2)
+    (tmp_path / "cand_run0.json").write_text(json.dumps(make_run(0, 0, policy_violation=True), sort_keys=True),
+                                              encoding="utf-8")
+    policy = tmp_path / "policy.json"
+    policy.write_text(json.dumps(POLICY))
+    _code, out, _ = _run(["compare", "--baseline", *map(str, base), "--candidate", *map(str, cand),
+                          "--policy", str(policy), "--resamples", "400"], capsys)
+    assert "safety (1 policy violation)" in _verdict(out)
+
+
+def test_markdown_absolute_change_is_not_a_percent(tmp_path, capsys):
+    # a baseline with zero calls makes `approach` fall back to an absolute change
+    base = write_side(tmp_path, "base", runs=2, world_seed=1, run_seed=1, zero_calls=True)
+    cand = write_side(tmp_path, "cand", runs=2, world_seed=1, run_seed=1)
+    md = tmp_path / "abs.md"
+    _run(["compare", "--baseline", *map(str, base), "--candidate", *map(str, cand),
+          "--resamples", "400", "--markdown", str(md)], capsys)
+    text = md.read_text()
+    assert "approach: absolute change used because the baseline mean is 0" in text
+    row = next(line for line in text.splitlines() if line.startswith("| approach |"))
+    assert "%" not in row.split("|")[4]  # the change cell
 
 
 def test_strict_turns_review_into_exit_1(capsys, tmp_path):

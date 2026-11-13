@@ -449,6 +449,24 @@ def test_compare_cost_missing_unit_none_warning_and_cost_per_solved_none(tmp_pat
     assert res["cost_per_solved"]["delta_pct"] is None
 
 
+def test_compare_cost_units_agree_but_no_shared_value_warns(tmp_path):
+    # the candidate has a usd cost, but only in a run whose scenarios are not shared: the unit matches
+    # the baseline (usd) while no shared scenario has a cost on either side
+    base = _base(tmp_path)
+    priced = write_side(tmp_path / "priced", "cand", runs=1, world_seed=1, run_seed=1)[0]
+    _edit_scenarios(priced, lambda s: "x" + s[1:])
+    unpriced = write_side(tmp_path / "unpriced", "cand", runs=1, world_seed=1, run_seed=2, cost_usd=None)[0]
+    doc = json.loads(unpriced.read_text(encoding="utf-8"))
+    for s in doc["resourceSpans"][0]["scopeSpans"][0]["spans"]:
+        s["attributes"] = [a for a in s["attributes"]
+                           if a["key"] not in ("gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens")]
+    unpriced.write_text(json.dumps(doc, sort_keys=True), encoding="utf-8")
+    res = compare(base, _load_paths([priced, unpriced]), resamples=400, seed=0)
+    assert res["dimensions"]["cost"]["label"] == "n/a"
+    assert "cost n/a: missing on one side (every value is None), not gated" in res["warnings"]
+    assert not any("is in USD" in w or "missing on candidate" in w for w in res["warnings"])
+
+
 def test_compare_cost_usd_vs_tokens_warning_and_cost_per_solved_none(tmp_path):
     base = _base(tmp_path)
     cand = _run_side(tmp_path, "cand", runs=2, world_seed=1, run_seed=1, cost_usd=None)
