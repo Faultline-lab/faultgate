@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import shlex
 import sys
@@ -10,6 +12,7 @@ from pathlib import Path
 
 from faultgate import __version__
 from faultgate import band as bandmod
+from faultgate import compare as comparemod
 from faultgate.checks import CHECKS, OUTCOME, Golden, Outcomes, Policy, select
 from faultgate.judge import JUDGE_SPECS, get_judge
 from faultgate.runner import Report
@@ -18,7 +21,9 @@ from faultgate.formats import FORMATS
 from faultgate.formats import load as load_traces
 from faultgate.precheck import DEFAULT_SAMPLE, describe_policy, precheck
 from faultgate.redact import REDACTIONS, get_redactor
-from faultgate.report import _outcome_line, display_path, markdown, write_audit
+from faultgate.report import (_cmp_budget, _cmp_change, _cmp_delta, _cmp_value, _outcome_line, _safety_bound,
+                              compare_markdown, display_path, markdown, write_audit, write_compare_audit)
+from faultgate.compare import load_budget, load_prices
 
 
 def _table(report: Report) -> str:
@@ -194,6 +199,113 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     return 0
 
 
+def _compare_side(paths, checks, judge, fmt: str, redactor) -> list[tuple[Report, list]]:
+    """One (Report, traces) per run file: each file is loaded once and keeps its own Report."""
+    side = []
+    for path in paths:
+        traces = _load(path, fmt)
+        side.append((run_checks(traces, checks, judge, redactor), traces))
+    return side
+
+
+def _compare_table(result: dict) -> str:
+    rows = [("dimension", "baseline", "candidate", "change [ci]", "budget", "result")]
+    for name, e in result["dimensions"].items():
+        rows.append((name, _cmp_value(name, e["baseline"], e["unit"]), _cmp_value(name, e["candidate"], e["unit"]),
+                     _cmp_change(name, e), _cmp_budget(name, e), e["label"]))
+    widths = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
+    return "\n".join("  " + "  ".join(c.ljust(w) for c, w in zip(row, widths)).rstrip() for row in rows)
+
+
+def _verdict_line(result: dict) -> str:
+    dims = result["dimensions"]
+    safety = [f"safety ({result['safety']['violations']} policy violations)"] if result["safety"]["label"] == "BLOCK" else []
+
+    def on(label: str) -> str:
+        found = [f"{d} ({_cmp_delta(d, e)}, budget {_cmp_budget(d, e)})" for d, e in dims.items() if e["label"] == label]
+        return ", ".join((safety if label == "WORSE" else []) + found) or "nothing"
+
+    return f"verdict: {result['verdict']} · worse on {on('WORSE')} · better on {on('BETTER')}"
+
+
+def _compare_terminal(result: dict) -> list[str]:
+    dims, s = result["dimensions"], result["safety"]
+    gated = sum(1 for d in comparemod.DIMENSIONS if dims.get(d, {}).get("gates") and dims[d]["label"] != "n/a")
+    lines = [f"compare: {result['n']} scenarios · baseline {result['runs']['baseline']} runs · "
+             f"candidate {result['runs']['candidate']} runs · seed {result['seed']} · "
+             f"CI {round(result['ci_level'] * 100, 2):g}% ({gated} gated dimensions)", "", _compare_table(result), "",
+             f"safety  {s['violations']} policy violations  {s['runs']} candidate runs  {s['label']}{_safety_bound(s)}"]
+    speed = dims.get("speed") or {}
+    if speed.get("p50"):
+        p50, p95 = speed["p50"], speed["p95"]
+        lines.append(f"p50 latency: {_cmp_value('speed', p50['baseline'], None)} -> {_cmp_value('speed', p50['candidate'], None)}"
+                     f" · p95 latency: {_cmp_value('speed', p95['baseline'], None)} -> "
+                     f"{_cmp_value('speed', p95['candidate'], None)} (reported, not gated)")
+    cost, cps = dims.get("cost") or {}, result["cost_per_solved"]
+    if cps["baseline"] is not None and cps["candidate"] is not None and cps["delta_pct"] is not None:
+        lines.append(f"cost per solved task: {_cmp_value('cost', cps['baseline'], cost.get('unit'))} -> "
+                     f"{_cmp_value('cost', cps['candidate'], cost.get('unit'))} ({cps['delta_pct']:+.0f}%)")
+    else:
+        lines.append("cost per solved task: n/a")
+    ts = result["trajectory_similarity"]
+    lines.append("trajectory similarity: " + ("n/a" if ts is None else f"{ts:.2f}"))
+    lines.append("new tools: " + (", ".join(result["new_tools"]) or "none"))
+    lines.append("regressions: " + (", ".join(result["regressions"]) or "none"))
+    changes = [f"{c} {e['baseline']:.1f} -> {e['candidate']:.1f} ({e['delta']:+.1f})"
+               for c, e in result["check_deltas"].items() if e["delta"]]
+    lines.append("check fire-count changes: " + (", ".join(changes) or "none"))
+    lines += [f"note: {d}: {e['note']}" for d, e in dims.items() if e.get("note")]
+    lines += ["", _verdict_line(result)]
+    return lines
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    captured = io.StringIO()
+    try:
+        # compare.compare re-checks this too; here it is ahead of the trace loading on purpose
+        if args.resamples < 200:
+            raise ValueError(f"--resamples must be 200 or more, got {args.resamples}")
+        with contextlib.redirect_stderr(captured):
+            checks = select(args.check, _policy(args), _golden(args), _outcomes(args))
+            judge = _judge_or_none(args, checks)
+            budget = load_budget(args.budget) if args.budget else None
+            prices = load_prices(args.prices) if args.prices else None
+            redactor = get_redactor(args.redact)
+            baseline = _compare_side(args.baseline, checks, judge, args.format, redactor)
+            candidate = _compare_side(args.candidate, checks, judge, args.format, redactor)
+            result = comparemod.compare(baseline, candidate, budget, prices, args.resamples, args.seed)
+    except (ValueError, KeyError, OSError, ImportError) as e:
+        print(f"faultgate: {e}", file=sys.stderr)
+        return 2
+
+    sys.stderr.write(captured.getvalue())
+
+    code = 1 if args.strict and result["verdict"] == "REVIEW" else result["exit_code"]
+    result["exit_code"] = code  # the written reports carry the code the shell sees
+    command = _repro(getattr(args, "argv", None) or ["compare"])
+    try:
+        if args.json:
+            _write(args.json, json.dumps(result, indent=1, sort_keys=True))
+            print(f"report written to {args.json}")
+        if args.markdown:
+            _write(args.markdown, compare_markdown(result, command))
+            print(f"markdown written to {args.markdown}")
+        if args.audit:
+            inputs = ([("baseline", p) for p in args.baseline] + [("candidate", p) for p in args.candidate]
+                      + [(role, p) for role, p in (("golden", args.golden), ("outcomes", args.outcomes),
+                                                   ("policy", args.policy), ("budget", args.budget),
+                                                   ("prices", args.prices)) if p])
+            write_compare_audit(args.audit, result, inputs, [r for r, _ in candidate], command, code)
+            print(f"audit written to {args.audit}")
+    except OSError as e:
+        print(f"faultgate: cannot write output: {e}", file=sys.stderr)
+        return 2
+    for w in result["warnings"]:
+        print(f"warning: {w}", file=sys.stderr)
+    print("\n".join(_compare_terminal(result)))  # the verdict is the last line
+    return code
+
+
 def cmd_precheck(args: argparse.Namespace) -> int:
     needs_json = False
     if args.policy:
@@ -259,6 +371,27 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--redact", default="builtin", choices=REDACTIONS,
                    help="mask PII and secrets in judge input (API judges) and in every reason written out (default builtin)")
     b.set_defaults(fn=cmd_baseline)
+    cm = sub.add_parser("compare", help="compare two sets of runs of the same scenarios: better, worse or noise?")
+    cm.add_argument("--baseline", nargs="+", required=True, help="trace files, one per baseline run (>= 2)")
+    cm.add_argument("--candidate", nargs="+", required=True, help="trace files, one per candidate run (>= 2)")
+    cm.add_argument("--golden", default=None, help="golden.json, applied to both sides")
+    cm.add_argument("--outcomes", default=None, help="outcomes.json, applied to both sides")
+    cm.add_argument("--policy", default=None, help="policy.json, applied to both sides; a violation blocks")
+    cm.add_argument("--budget", default=None, help='budget.json: {"cost": {"budget": 0.05, "gate": true}, ...}')
+    cm.add_argument("--prices", default=None, help="prices.json: {model: {input_per_m, output_per_m} or "
+                                                    "{gpu_hour_usd, concurrency}}")
+    cm.add_argument("--check", default=None, help="comma-separated subset of checks (default: all)")
+    cm.add_argument("--judge", default=None, help="judge checks: laya or litellm:<model> (default: rules only)")
+    cm.add_argument("--format", default="auto", choices=FORMATS, help="trace format (default: detect)")
+    cm.add_argument("--redact", default="builtin", choices=REDACTIONS,
+                   help="mask PII and secrets in judge input and in every reason written out (default builtin)")
+    cm.add_argument("--resamples", type=int, default=2000, help="bootstrap resamples (default 2000, min 200)")
+    cm.add_argument("--seed", type=int, default=0, help="bootstrap seed (default 0)")
+    cm.add_argument("--strict", action="store_true", help="exit 1 on REVIEW, not only on BLOCK")
+    cm.add_argument("--json", default=None, help="also write the full result to this path")
+    cm.add_argument("--markdown", default=None, help="write a Markdown scorecard (PR comment / job summary)")
+    cm.add_argument("--audit", default=None, help="write verdict.json, failing_traces.json and repro.sh here")
+    cm.set_defaults(fn=cmd_compare)
     pc = sub.add_parser("precheck", help="validate a trace export (format, roots, span ids, timestamps, content) before checking it")
     pc.add_argument("traces", help="trace export: OTLP/JSON, OpenInference, Langfuse, LangSmith or Braintrust")
     pc.add_argument("--format", default="auto", choices=FORMATS)
