@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from typing import Any
 
 from faultgate.checks import Check
 from faultgate.judge import Judge, Verdict
@@ -24,7 +25,7 @@ class Report:
     checks: list[str]
     results: list[Result] = field(default_factory=list)
     redaction: str = "off"
-    measures: dict[str, dict[str, float | None]] = field(default_factory=dict)  # trace id -> tokens, latency_ms, cost_usd
+    measures: dict[str, dict[str, Any]] = field(default_factory=dict)  # trace id -> tokens, latency_ms, cost_usd, steps, model
 
     @property
     def trace_ids(self) -> list[str]:
@@ -117,8 +118,13 @@ def run(traces: list[Trace], checks: list[Check], judge: Judge | None = None,
     for t in traces:
         scenario = safe_key(t.key, redact)  # what is written out and matched against bands
         u = t.usage
-        report.measures[t.trace_id] = {"tokens": float(sum(u.values())) if u else None,
-                                       "latency_ms": t.latency_ms, "cost_usd": t.cost_usd}
+        report.measures[t.trace_id] = {
+            "tokens": float(sum(u.values())) if u else None,
+            "latency_ms": t.latency_ms,
+            "cost_usd": t.cost_usd,
+            "steps": len(t.steps),
+            "model": t.model,
+        }
         state = None
         for c in active:
             if c.rule:
