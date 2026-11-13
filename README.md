@@ -57,6 +57,8 @@ faultgate judges                                     # list judge specs
 
 faultgate baseline run1.json run2.json run3.json --out band.json   # measure your noise (3+ runs)
 faultgate check candidate.json --band band.json          # regression, or just noise?
+
+faultgate compare --baseline base1.json base2.json --candidate cand1.json cand2.json   # is the new model better?
 ```
 
 Exit codes: `0` clean · `1` at least one check fired (or, with `--band`, gate FAIL) · `2` bad input, or an output file (`--json`, `--markdown`, `--audit`, `--out`) that cannot be written. Missing parent directories of output files are created.
@@ -367,6 +369,90 @@ outcome: 23/28 true (0.82) · 2 scenario(s) without an outcome, not judged · st
 ```
 
 Without `--outcomes` there is no `outcome` check and the report is exactly as before. Build the band and check the candidate with the same flags: a band built without outcomes warns when the check sets differ.
+
+## Compare two models
+
+Switched the model, quantized it, upgraded the serving engine or rewrote the prompt? `compare` reads the runs both sides already produced on the same scenarios and answers better / worse / noise on six dimensions. No model is called, nothing leaves the machine.
+
+```bash
+$ faultgate compare --baseline examples/gate/baseline_glm_run1.json examples/gate/baseline_glm_run2.json \
+      --candidate examples/gate/baseline_glm_run1.json examples/gate/baseline_glm_run2.json
+compare: 30 scenarios · baseline 2 runs · candidate 2 runs · seed 0 · CI 98.75% (4 gated dimensions)
+
+  dimension    baseline    candidate   change [ci]          budget  result
+  correctness  0.93        0.93        +0.00 [-0.08,+0.10]  0.03    INCONCLUSIVE
+  consistency  0.87        0.87        +0.00 [-0.10,+0.10]  0.03    INCONCLUSIVE
+  approach     15.4 calls  15.4 calls  +0% [-7%,+8%]        +10%    SAME
+  cost         n/a         n/a         n/a                  +5%     n/a
+  speed        16.5 s      16.5 s      +0% [-6%,+7%]        +10%    SAME
+
+safety  0 policy violations  60 candidate runs  PASS (95% upper bound on violation rate: 4.87% over 60 runs)
+p50 latency: 16.1 s -> 16.1 s · p95 latency: 24.1 s -> 24.1 s (reported, not gated)
+cost per solved task: n/a
+trajectory similarity: 0.91
+new tools: none
+regressions: none
+check fire-count changes: none
+
+verdict: REVIEW · worse on nothing · better on nothing
+```
+
+Same files on both sides (a model against itself) comes out REVIEW, never BLOCK: the two correctness dimensions say INCONCLUSIVE because 30 scenarios cannot resolve a change of 0.03. That is the point.
+
+**The six dimensions.**
+
+| Dimension | Value | Change |
+|---|---|---|
+| correctness | clean rate per scenario (`--golden`, `--outcomes` and `--policy` included, exactly as the gate decides it) | absolute |
+| consistency | unbiased pass^k over the runs of a scenario, k = min(baseline runs, candidate runs); catches a model that gets the right answer at random | absolute |
+| approach | tool calls per run (`len(trace.steps)`) | relative |
+| cost | `faultgate.cost_usd`, else tokens × `--prices`, else wall time × `gpu_hour_usd / concurrency`, else tokens (labelled `tokens (no price)`) | relative |
+| speed | mean latency per run; p50 and p95 are reported, not gated | relative |
+| safety | policy violations in any candidate run — a hard block, never a statistic | — |
+
+Each statistical dimension gets a two-level paired bootstrap (scenarios, then runs within a scenario) over `--resamples` draws seeded by `--seed`, and a Bonferroni CI: α' = 0.05 / gated dimensions, so 99% with the default five. Labels: **WORSE** when the CI's worsening is above the budget, **BETTER** when it is below zero, **SAME** when it is inside the budget, else **INCONCLUSIVE** with the number of scenarios that would settle it.
+
+**Verdict and exit code.** BLOCK = a policy violation or a gated WORSE (exit 1) · REVIEW = no WORSE but a gated INCONCLUSIVE (exit 0; `--strict` makes it exit 1) · SHIP otherwise (exit 0). Bad input exits 2 with one line.
+
+**budget.json** — what counts as no real change (relative fractions for approach, cost and speed; absolute for correctness and consistency; the values below are the defaults at 30 scenarios):
+
+```json
+{"correctness": {"budget": 0.03}, "approach": {"budget": 0.10}, "cost": {"budget": 0.05},
+ "speed": {"budget": 0.10, "gate": true}, "speed_p95": {"budget": 0.20, "gate": false}}
+```
+
+`"gate": false` reports a dimension without letting it decide the verdict. `speed_p95` is a pooled point estimate with no CI, so it is off by default.
+
+**prices.json** — per model, so any stack can be compared in money:
+
+```json
+{"frontier-model-x": {"input_per_m": 3.00, "output_per_m": 15.00},
+ "llama-70b-awq@onprem": {"gpu_hour_usd": 2.40, "concurrency": 16}}
+```
+
+Prices are matched on the trace's model name: `gen_ai.request.model` on the root span, else the first span's `gen_ai.response.model` or `gen_ai.request.model`.
+
+**Honest limits.**
+
+- Self-hosted cost is an estimate: wall time × `gpu_hour_usd / concurrency` bills the whole run at that rate. It is marked as such in the output.
+- Tokens from different tokenizers are not comparable. If one side is in USD and the other only has tokens, cost is n/a with a warning naming the side that needs `--prices`. If both sides are in tokens from different model names and no prices cover them, `compare` warns that tokens are not comparable across tokenizers and still compares tokens.
+- At small n the answer is INCONCLUSIVE, not a guess: the label carries the scenarios needed (`n' = n × ((z + z₀.₈₀) × se / |w − budget|)²`) and JSON carries the same number under `scenarios_needed`.
+- Zero violations seen is not zero risk. The upper bound is `1 − 0.05^(1/N)` over N candidate runs: 2.95% at 100 runs, 4.87% at 60.
+- A dimension is compared against the **mean** of the baseline runs, while `check --band` fails only below the observed **minimum**. Borderline cases can differ; they are different questions.
+- `--json` is byte-identical for the same inputs and seed (`sort_keys`, rounded floats, no timestamps, no absolute paths). `--markdown` gives the PR comment, `--audit DIR` the replayable bundle (verdict.json with every input's SHA-256, seed and resamples; failing_traces.json; repro.sh).
+
+**Calibration.** Measured with `python scripts/calibrate_compare.py --seeds 200` (synthetic runs, 30 scenarios × 3 runs a side, 2000 resamples, 669 s). These are synthetic runs, not a real model pair.
+
+| Run | Rate | Target |
+|---|---|---|
+| same-distribution pairs BLOCK | 0.0% | ≤ 5% |
+| cost +30% detected | 100.0% | ≥ 80% |
+| latency +30% detected | 100.0% | ≥ 80% |
+| calls +30% detected | 100.0% | ≥ 80% |
+| correctness 0.9 → 0.6 detected | 82.5% | ≥ 80% |
+| correctness 0.9 → 0.7 detected | 37.5% | ≥ 80% |
+
+"Detected" means that dimension is WORSE and no other is (consistency may move with correctness). The last row is below the 80% target: at n = 30 × 3 runs a 0.2 drop is mostly INCONCLUSIVE with scenarios needed; use more scenarios or runs.
 
 ## In CI
 

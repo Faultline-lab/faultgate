@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 — 2026-11-13
+
+`faultgate compare`: is the new model better or worse? One command over the runs both sides already produced, one verdict, no LLM judge, nothing leaves the machine.
+
+- `faultgate compare --baseline B1 B2 [--candidate C1 C2 ...]`: ≥ 2 runs a side, the same checks and judge on both. Six dimensions: correctness, consistency (unbiased pass^k), approach (tool calls), cost, speed, safety (policy). Labels BETTER / SAME / WORSE / INCONCLUSIVE / n/a from a two-level paired bootstrap (scenarios, then runs) with a Bonferroni CI (99% by default) and `--seed`; below the noise floor the label carries the scenarios needed to settle it.
+- Verdict: BLOCK on a policy violation or a gated worse dimension (exit 1) · REVIEW on no worse but an inconclusive gated dimension (exit 0, exit 1 with `--strict`) · SHIP otherwise. Bad input exits 2 with one line.
+- `--budget budget.json` (per-dimension budget and gate, including an optional non-default gated `speed_p95`), `--prices prices.json` (per-model token or GPU-hour prices, so a migration can be compared in money). Cost falls back to `faultgate.cost_usd`, then prices, then the self-hosted estimate, then tokens; the two sides must share a unit.
+- Terminal scorecard with units and CIs, p50/p95 latency (reported, not gated), cost per solved task, trajectory similarity, new tools, regressions, per-check fire-count changes; `--json` (byte-identical for the same inputs and seed), `--markdown` (PR comment with the exact reproduce command), `--audit DIR` (verdict.json with seed, resamples and every input's SHA-256, failing_traces.json, repro.sh).
+- Safety honesty: the safety line and JSON always carry the one-sided 95% upper bound on the violation rate when no violation was seen (`1 - 0.05^(1/N)`), because zero seen is not zero risk.
+- No new dependency (standard library plus pydantic). `check`, `baseline`, `precheck`, `checks` and `judges` are unchanged.
+
 ## 0.4.1 — 2026-10-26
 
 - Update package metadata and bundled README with the FAULTLINE product page and current source repository. Runtime behavior is unchanged.
