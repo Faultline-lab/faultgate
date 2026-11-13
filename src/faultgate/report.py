@@ -107,6 +107,101 @@ def _outcome_line(o: dict[str, Any], markdown: bool = False) -> str:
             f"structural clean rate {o['structural_clean_rate']:.2f}")
 
 
+ABSOLUTE_DIMS = {"correctness", "consistency"}  # change is a difference, not a ratio
+
+
+def _cmp_fmt(d: str, entry: dict[str, Any]) -> str:
+    """A relative dimension that fell back to absolute change prints a difference, not a percent."""
+    return "{:+.2f}" if d in ABSOLUTE_DIMS or "absolute change" in (entry["note"] or "") else "{:+.0%}"
+
+
+def _cmp_delta(d: str, entry: dict[str, Any]) -> str:
+    if entry["delta"] is None:
+        return "n/a"
+    return _cmp_fmt(d, entry).format(entry["delta"])
+
+
+def _cmp_change(d: str, entry: dict[str, Any]) -> str:
+    delta = _cmp_delta(d, entry)
+    if entry["ci"] is None:
+        return delta
+    fmt = _cmp_fmt(d, entry)
+    lo, hi = entry["ci"]
+    return f"{delta} [{fmt.format(lo)},{fmt.format(hi)}]"
+
+
+def _cmp_budget(d: str, entry: dict[str, Any]) -> str:
+    return f"{entry['budget']:.2f}" if d in ABSOLUTE_DIMS else f"{entry['budget']:+.0%}"
+
+
+def _cmp_value(d: str, v: float | None, unit: str | None) -> str:
+    if v is None:
+        return "n/a"
+    if d in ABSOLUTE_DIMS:
+        return f"{v:.2f}"
+    if d == "approach":
+        return f"{v:.1f} calls"
+    if d in ("speed", "speed_p95"):
+        return f"{v / 1000:.1f} s"
+    return f"${v:.4f}" if unit == "usd" else f"{v:,.0f} tokens"
+
+
+def _safety_bound(safety: dict[str, Any]) -> str:
+    """Zero violations seen is not zero risk: report the one-sided 95% upper bound on the rate."""
+    if safety["upper_bound_95"] is None:
+        return ""
+    return f" (95% upper bound on violation rate: {safety['upper_bound_95']:.2%} over {safety['runs']} runs)"
+
+
+def compare_markdown(result: dict[str, Any], command: str) -> str:
+    """PR comment / job summary for `faultgate compare`: the scorecard and the exact reproduce command."""
+    d = result["dimensions"]
+    r = result["runs"]
+    lines = [MARKER, f"## faultgate compare: {result['verdict']}", "",
+             f"{result['n']} scenarios · baseline {r['baseline']} runs · candidate {r['candidate']} runs · "
+             f"seed {result['seed']} · CI {round(result['ci_level'] * 100, 2):g}%", "",
+             "| dimension | baseline | candidate | change | budget | result |", "|---|---|---|---|---|---|"]
+    for name, e in d.items():
+        lines.append(f"| {name} | {_cell(_cmp_value(name, e['baseline'], e['unit']))} | "
+                     f"{_cell(_cmp_value(name, e['candidate'], e['unit']))} | {_cmp_change(name, e)} | "
+                     f"{_cmp_budget(name, e)} | {e['label']} |")
+    s = result["safety"]
+    lines += ["", f"**Safety:** {s['violations']} policy violations in {s['runs']} candidate runs · "
+                  f"{s['label']}{_safety_bound(s)}"]
+    if result["regressions"]:
+        shown = ", ".join(f"`{_cell(x)}`" for x in result["regressions"][:MAX_ROWS])
+        more = f" and {len(result['regressions']) - MAX_ROWS} more" if len(result["regressions"]) > MAX_ROWS else ""
+        lines += ["", f"**Regressions** (clean in every baseline run, not any more): {shown}{more}"]
+    if result["warnings"]:
+        lines += ["", "**Warnings**", ""] + [f"- {_cell(w)}" for w in result["warnings"]]
+    lines += ["", "### Reproduce locally", "", "```sh", f"pip install 'faultgate=={__version__}'", command, "```", ""]
+    return "\n".join(lines)
+
+
+def write_compare_audit(out_dir: str | Path, result: dict[str, Any], inputs: list[tuple[str, str]],
+                        candidate_reports: list[Report], command: str, exit_code: int) -> None:
+    """The compare audit: verdict.json (inputs, seed, resamples, the result), failing_traces.json, repro.sh."""
+    d = Path(out_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    verdict = {
+        "faultgate_version": __version__,
+        "created_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "verdict": result["verdict"],
+        "exit_code": exit_code,
+        "command": command,
+        "seed": result["seed"],
+        "resamples": result["resamples"],
+        "inputs": [{"role": role, "path": display_path(p), "sha256": _sha256(p)} for role, p in inputs],
+        "compare": result,
+    }
+    (d / "verdict.json").write_text(json.dumps(verdict, indent=1), encoding="utf-8")
+    (d / "failing_traces.json").write_text(
+        json.dumps([{"run": i, "failing": _failing(r)} for i, r in enumerate(candidate_reports, 1)], indent=1),
+        encoding="utf-8")
+    (d / "repro.sh").write_text(f"#!/bin/sh\n# faultgate {__version__} · verdict {result['verdict']} · exit {exit_code}\n"
+                                f"pip install 'faultgate=={__version__}'\n{command}\n", encoding="utf-8")
+
+
 def _sha256(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:

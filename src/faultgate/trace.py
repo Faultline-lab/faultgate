@@ -145,6 +145,17 @@ class Trace(BaseModel):
         return float(sum(costs)) if costs else None
 
     @property
+    def model(self) -> str | None:
+        r = self.root
+        if r and r.attrs.get("gen_ai.request.model"):
+            return str(r.attrs["gen_ai.request.model"])
+        for s in self.spans:
+            m = s.attrs.get("gen_ai.response.model") or s.attrs.get("gen_ai.request.model")
+            if m:
+                return str(m)
+        return None
+
+    @property
     def has_content(self) -> bool:
         return bool(self.prompt or self.answer or any(st.arguments or st.result for st in self.steps))
 
