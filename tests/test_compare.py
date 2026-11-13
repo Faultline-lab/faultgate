@@ -167,6 +167,8 @@ def test_upper_bound_95():
 
     assert upper_bound_95(0, 100) == 0.0295
     assert upper_bound_95(0, 1) == 0.95
+    assert upper_bound_95(0, 0) is None
+    assert upper_bound_95(1, 0) is None
     assert upper_bound_95(1, 100) is None
     assert upper_bound_95(3, 5) is None
 
@@ -410,3 +412,78 @@ def test_compare_speed_p95_is_gated_point_estimate(tmp_path):
     assert p95["label"] == "WORSE"
     assert res["ci_level"] == pytest.approx(0.99)  # speed_p95 is not counted in g
     assert res["verdict"] == "BLOCK"
+
+
+def test_compare_repeated_trace_ids_across_runs_costs_not_overwritten(tmp_path):
+    base = _base(tmp_path)
+    r0 = make_run(1, 1000, cost_usd=0.02)
+    r1 = make_run(1, 1000, cost_usd=0.06)  # identical trace_ids as r0
+    p0 = tmp_path / "cand_run0.json"
+    p1 = tmp_path / "cand_run1.json"
+    p0.write_text(json.dumps(r0, sort_keys=True), encoding="utf-8")
+    p1.write_text(json.dumps(r1, sort_keys=True), encoding="utf-8")
+    cand = _load_paths([p0, p1])
+    res = compare(base, cand, resamples=400, seed=0)
+    cand_mean = res["dimensions"]["cost"]["candidate"]
+    r0_only = compare(base, _load_paths([p0, p0]), resamples=400, seed=0)["dimensions"]["cost"]["candidate"]
+    r1_only = compare(base, _load_paths([p1, p1]), resamples=400, seed=0)["dimensions"]["cost"]["candidate"]
+    assert cand_mean == pytest.approx((r0_only + r1_only) / 2, abs=2e-6)
+
+
+def test_compare_cost_missing_unit_none_warning_and_cost_per_solved_none(tmp_path):
+    base = _base(tmp_path)
+    paths = write_side(tmp_path, "cand", runs=2, world_seed=1, run_seed=1)
+    for p in paths:
+        doc = json.loads(Path(p).read_text(encoding="utf-8"))
+        for s in doc["resourceSpans"][0]["scopeSpans"][0]["spans"]:
+            s["attributes"] = [a for a in s.get("attributes", [])
+                               if a["key"] not in ("faultgate.cost_usd", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens")]
+        Path(p).write_text(json.dumps(doc, sort_keys=True), encoding="utf-8")
+    cand = _load_paths(paths)
+    res = compare(base, cand, resamples=400, seed=0)
+    assert res["dimensions"]["cost"]["label"] == "n/a"
+    assert "cost n/a: missing on candidate" in res["warnings"]
+    assert not any("is in USD" in w for w in res["warnings"])
+    assert res["cost_per_solved"]["baseline"] is None
+    assert res["cost_per_solved"]["candidate"] is None
+    assert res["cost_per_solved"]["delta_pct"] is None
+
+
+def test_compare_cost_usd_vs_tokens_warning_and_cost_per_solved_none(tmp_path):
+    base = _base(tmp_path)
+    cand = _run_side(tmp_path, "cand", runs=2, world_seed=1, run_seed=1, cost_usd=None)
+    res = compare(base, cand, resamples=400, seed=0)
+    assert res["dimensions"]["cost"]["label"] == "n/a"
+    assert any("cost n/a: baseline is in USD, candidate only has tokens" in w for w in res["warnings"])
+    assert not any("missing on candidate" in w for w in res["warnings"])
+    assert res["cost_per_solved"]["baseline"] is None
+    assert res["cost_per_solved"]["candidate"] is None
+    assert res["cost_per_solved"]["delta_pct"] is None
+
+
+def test_compare_tokenizer_warning_unrelated_prices_do_not_silence(tmp_path):
+    base = _run_side(tmp_path, "base", runs=2, world_seed=1, run_seed=1, cost_usd=None, model="model-a")
+    cand = _run_side(tmp_path, "cand", runs=2, world_seed=1, run_seed=1, cost_usd=None, model="model-b")
+    unrelated_prices = load_prices(_json_file(tmp_path, "prices.json",
+                                              {"unrelated-model": {"input_per_m": 1.0, "output_per_m": 2.0}}))
+    res = compare(base, cand, prices=unrelated_prices, resamples=400, seed=0)
+    assert res["dimensions"]["cost"]["unit"] == "tokens (no price)"
+    assert any("tokens are not comparable across tokenizers" in w and "model-a" in w and "model-b" in w
+               for w in res["warnings"])
+
+
+def test_compare_speed_p95_gated_no_latency_warns(tmp_path):
+    base = _base(tmp_path)
+    paths = write_side(tmp_path, "cand", runs=2, world_seed=1, run_seed=1)
+    for p in paths:
+        doc = json.loads(Path(p).read_text(encoding="utf-8"))
+        for s in doc["resourceSpans"][0]["scopeSpans"][0]["spans"]:
+            s.pop("startTimeUnixNano", None)
+            s.pop("endTimeUnixNano", None)
+        Path(p).write_text(json.dumps(doc, sort_keys=True), encoding="utf-8")
+    cand = _load_paths(paths)
+    res = compare(base, cand, budget={"speed_p95": {"gate": True}}, resamples=400, seed=0)
+    p95 = res["dimensions"]["speed_p95"]
+    assert p95["label"] == "n/a"
+    assert p95["gates"] is False
+    assert "speed_p95 n/a: missing on one side, not gated" in res["warnings"]

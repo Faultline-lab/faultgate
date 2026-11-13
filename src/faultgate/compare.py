@@ -41,14 +41,14 @@ def _number(where: str, field: str, v: Any, minimum: float) -> None:
 
 def upper_bound_95(violations: int, n: int) -> float | None:
     """One-sided 95% upper bound on the violation rate after 0 violations in n runs; None if any was seen."""
-    return round(1 - 0.05 ** (1 / n), 4) if violations == 0 else None
+    return round(1 - 0.05 ** (1 / n), 4) if violations == 0 and n > 0 else None
 
 
 def load_budget(path: str | Path) -> dict[str, dict[str, Any]]:
     """budget.json -> {dimension: {"budget": float, "gate": bool}}; ValueError (one line) on any violation."""
     doc = _load_json(path, "budget.json")
     if not isinstance(doc, dict):
-        raise ValueError(f"budget.json: expected a JSON object of dimension -> {{budget, gate}}")
+        raise ValueError("budget.json: expected a JSON object of dimension -> {budget, gate}")
     out: dict[str, dict[str, Any]] = {}
     for name, entry in doc.items():
         if name not in BUDGET_KEYS:
@@ -100,7 +100,7 @@ def _scenario_mean(table: dict[str, list[float | None]], scen: list[str]) -> flo
 
 def _pass_k(values: list[float], k: int) -> float:
     """Unbiased pass^k = C(c, k) / C(r, k)."""
-    return math.comb(int(sum(values)), k) / math.comb(len(values), k)
+    return math.comb(int(round(sum(values))), k) / math.comb(len(values), k)
 
 
 def _percentile(vals: list[float], p: float) -> float | None:
@@ -147,12 +147,11 @@ def _trace_cost(trace: Any, measure: dict[str, Any],
 def _resolve_cost(side: list[tuple[Any, list[Any]]],
                   prices: dict[str, dict[str, float]] | None) -> dict[str, Any]:
     """One unit for a whole side: usd if every measured trace is usd, else tokens if every trace has them."""
-    raw: dict[str, tuple[float | None, str | None]] = {}
-    tokens: dict[str, float | None] = {}
-    models: set[str] = set()
-    self_hosted = False
+    runs_raw, runs_tokens = [], []
+    models, self_hosted = set(), False
     for report, traces in side:
         by_id = {t.trace_id: t for t in traces}
+        raw, tokens = {}, {}
         for tid in report.trace_ids:
             measure = report.measures.get(tid, {})
             tokens[tid] = measure.get("tokens")
@@ -165,35 +164,40 @@ def _resolve_cost(side: list[tuple[Any, list[Any]]],
             value, unit, estimate = _trace_cost(trace, measure, prices or {})
             self_hosted = self_hosted or estimate
             raw[tid] = (value, unit)
-    valued = [(v, u) for v, u in raw.values() if v is not None]
+        runs_raw.append(raw)
+        runs_tokens.append(tokens)
+
+    valued = [(v, u) for raw in runs_raw for v, u in raw.values() if v is not None]
+    all_tok = any(runs_raw) and all(t is not None for toks in runs_tokens for t in toks.values())
     if valued and all(u == "usd" for _, u in valued):
-        unit, values = "usd", {tid: v for tid, (v, _) in raw.items()}
-    elif raw and all(tokens.get(tid) is not None for tid in raw):
-        unit, values = "tokens", {tid: tokens[tid] for tid in raw}
+        unit, values = "usd", [{tid: v for tid, (v, _) in raw.items()} for raw in runs_raw]
+    elif all_tok:
+        unit, values = "tokens", [{tid: toks[tid] for tid in raw} for raw, toks in zip(runs_raw, runs_tokens)]
+    elif any(u == "usd" for _, u in valued):
+        unit, values = "usd", [{tid: (v if u == "usd" else None) for tid, (v, u) in raw.items()} for raw in runs_raw]
     else:
-        unit, values = "usd", {tid: v if u == "usd" else None for tid, (v, u) in raw.items()}
+        unit, values = None, [{tid: None for tid in raw} for raw in runs_raw]
     return {"unit": unit, "values": values, "models": models, "self_hosted": self_hosted}
 
 
 def _side_view(side: list[tuple[Any, list[Any]]], scen: list[str],
                prices: dict[str, dict[str, float]] | None) -> dict[str, Any]:
     cost = _resolve_cost(side, prices)
-    tables: dict[str, dict[str, list[float | None]]] = {d: {s: [] for s in scen} for d in DIMENSIONS}
+    tables = {d: {s: [] for s in scen} for d in ("correctness", "approach", "cost", "speed")}
     clean_runs, seqs = [], []
-    for report, traces in side:
+    for run_idx, (report, traces) in enumerate(side):
         by_id = {t.trace_id: t for t in traces}
-        run_ids = {s: t for t, s in report.scenario_of.items()}  # ponytail: repeated scenario -> last trace
-        clean = report.clean_by_scenario
-        clean_runs.append(clean)
+        # ponytail: repeated scenario in one run keeps only the last trace; ceiling is runs with deliberate repetitions per scenario; upgrade path: list traces per scenario and average or resample within the run
+        run_ids = {s: t for t, s in report.scenario_of.items()}
+        clean_runs.append(report.clean_by_scenario)
         seqs.append({s: tuple(st.tool for st in by_id[t].steps) for s, t in run_ids.items() if t in by_id})
         for s in scen:
             tid = run_ids.get(s)
             measure = report.measures.get(tid, {}) if tid is not None else {}
-            tables["correctness"][s].append(1.0 if tid is not None and clean.get(s, False) else 0.0)
+            tables["correctness"][s].append(1.0 if tid is not None and report.clean_by_scenario.get(s, False) else 0.0)
             tables["approach"][s].append(measure.get("steps") if tid is not None else None)
             tables["speed"][s].append(measure.get("latency_ms") if tid is not None else None)
-            tables["cost"][s].append(cost["values"].get(tid) if tid is not None else None)
-    tables["consistency"] = {s: list(v) for s, v in tables["correctness"].items()}
+            tables["cost"][s].append(cost["values"][run_idx].get(tid) if tid is not None else None)
     return {"tables": tables, "cost": cost, "clean": clean_runs, "seqs": seqs}
 
 
@@ -228,7 +232,7 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
 
     warnings: list[str] = []
     missing = sorted(({"run": i, "scenario": s} for i, (r, _) in enumerate(candidate, 1)
-                      for s in scen if s not in r.scenario_of.values()), key=lambda m: (m["run"], m["scenario"]))
+                      for s in scen if s not in r.clean_by_scenario), key=lambda m: (m["run"], m["scenario"]))
     if missing:
         warnings.append(f"{len(missing)} scenario-run(s) in the baseline are absent from candidate runs, "
                         "counted as failed")
@@ -244,10 +248,13 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
     def gate_of(d: str) -> bool:
         return bool(conf.get(d, {}).get("gate", True))
 
-    unit_mismatch = base["cost"]["unit"] != cand["cost"]["unit"]
-    active = {d: any(v is not None for s in scen for v in base["tables"][d][s])
-                 and any(v is not None for s in scen for v in cand["tables"][d][s]) for d in DIMENSIONS}
-    if unit_mismatch:
+    bu, cu = base["cost"]["unit"], cand["cost"]["unit"]
+    active = {
+        d: (any(v is not None for s in scen for v in base["tables"]["correctness" if d == "consistency" else d][s])
+            and any(v is not None for s in scen for v in cand["tables"]["correctness" if d == "consistency" else d][s]))
+        for d in DIMENSIONS
+    }
+    if bu is None or cu is None or bu != cu:
         active["cost"] = False
 
     g = max(1, sum(1 for d in DIMENSIONS if active[d] and gate_of(d)))
@@ -255,9 +262,9 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
     z = NormalDist().inv_cdf(1 - alpha / 2)
     z_power = NormalDist().inv_cdf(POWER)
     means = {d: (_scenario_mean(base["tables"][d], scen), _scenario_mean(cand["tables"][d], scen))
-             for d in DIMENSIONS}
-    means["consistency"] = (_scenario_mean(_pass_k_table(base, scen, k), scen),
-                            _scenario_mean(_pass_k_table(cand, scen, k), scen))
+             for d in ("correctness", "approach", "cost", "speed")}
+    means["consistency"] = (sum(_pass_k(base["tables"]["correctness"][s], k) for s in scen) / n,
+                            sum(_pass_k(cand["tables"]["correctness"][s], k) for s in scen) / n)
 
     rng = random.Random(seed)
     draws = [[(rng.randrange(n), [rng.randrange(rb) for _ in range(rb)], [rng.randrange(rc) for _ in range(rc)])
@@ -269,13 +276,17 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
             unit = None if d == "cost" else UNITS[d]
             results[d] = {"baseline": None, "candidate": None, "delta": None, "ci": None, "budget": t,
                           "gates": False, "label": "n/a", "scenarios_needed": None, "unit": unit, "note": None}
-            if d == "cost" and unit_mismatch:
-                bad = "candidate" if base["cost"]["unit"] == "usd" else "baseline"
-                other = "baseline" if bad == "candidate" else "candidate"
-                side = cand if bad == "candidate" else base
-                names = f": {', '.join(sorted(side['cost']['models']))}" if side["cost"]["models"] else ""
-                warnings.append(f"cost n/a: {other} is in USD, {bad} only has tokens; give --prices for the "
-                                f"{bad} model(s){names}")
+            if d == "cost":
+                if bu is None or cu is None:
+                    bad = [s for s, u in (("baseline", bu), ("candidate", cu)) if u is None]
+                    warnings.append(f"cost n/a: missing on {', '.join(bad)}")
+                elif bu != cu:
+                    bad = "candidate" if bu == "usd" else "baseline"
+                    other = "baseline" if bad == "candidate" else "candidate"
+                    side = cand if bad == "candidate" else base
+                    names = f": {', '.join(sorted(side['cost']['models']))}" if side["cost"]["models"] else ""
+                    warnings.append(f"cost n/a: {other} is in USD, {bad} only has tokens; give --prices for the "
+                                    f"{bad} model(s){names}")
             else:
                 warnings.append(f"{d} n/a: missing on one side (every value is None), not gated")
             if d == "speed":
@@ -283,24 +294,23 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
                 results[d]["p95"] = {"baseline": None, "candidate": None}
             continue
 
-        bt, ct = base["tables"][d], cand["tables"][d]
+        bt = base["tables"]["correctness" if d == "consistency" else d]
+        ct = cand["tables"]["correctness" if d == "consistency" else d]
         pairs: list[tuple[float, float]] = []
         for slots in draws:
-            bs: list[float] = []
-            cs: list[float] = []
+            bs, cs = [], []
             for si, bi, ci in slots:
                 s = scen[si]
                 if d == "consistency":
-                    bs.append(math.comb(int(sum(bt[s][j] for j in bi)), k) / math.comb(rb, k))
-                    cs.append(math.comb(int(sum(ct[s][j] for j in ci)), k) / math.comb(rc, k))
+                    bs.append(math.comb(int(round(sum(bt[s][j] for j in bi))), k) / math.comb(rb, k))
+                    cs.append(math.comb(int(round(sum(ct[s][j] for j in ci))), k) / math.comb(rc, k))
                     continue
                 bv = [bt[s][j] for j in bi if bt[s][j] is not None]
                 cv = [ct[s][j] for j in ci if ct[s][j] is not None]
                 if bv and cv:
                     bs.append(sum(bv) / len(bv))
                     cs.append(sum(cv) / len(cv))
-            # ponytail: a resample that drew no non-None value on a side falls back to the full-data
-            # mean instead of dropping the resample; only reachable for sparse cost/approach/speed data
+            # ponytail: a resample that drew no non-None value on a side falls back to the full-data mean instead of dropping the resample; only reachable for sparse cost/approach/speed data; ceiling is highly sparse data (>50% missing); upgrade path: re-draw the resample until valid or stratify draws over non-None values
             pairs.append((sum(bs) / len(bs) if bs else means[d][0],
                           sum(cs) / len(cs) if cs else means[d][1]))
 
@@ -315,8 +325,7 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
         else:
             w0 = delta0
         ordered = sorted(deltas)
-        lo = ordered[math.floor(alpha / 2 * (resamples - 1))]
-        hi = ordered[math.ceil((1 - alpha / 2) * (resamples - 1))]
+        lo, hi = ordered[math.floor(alpha / 2 * (resamples - 1))], ordered[math.ceil((1 - alpha / 2) * (resamples - 1))]
         ci = [-hi, -lo] if higher_better else [lo, hi]
         needed: int | str | None = None
         if lo > t:
@@ -327,12 +336,8 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
             label = "SAME"
         else:
             label = "INCONCLUSIVE"
-            half = (hi - lo) / 2
             gap = abs(w0 - t)
-            if gap < EPS:
-                needed = "cannot tell at any n"
-            else:
-                needed = math.ceil(n * ((z + z_power) * (half / z) / gap) ** 2)
+            needed = "cannot tell at any n" if gap < EPS else math.ceil(n * ((z + z_power) * ((hi - lo) / 2 / z) / gap) ** 2)
         notes = []
         if relative and absolute:
             notes.append("absolute change: baseline mean is 0")
@@ -340,34 +345,32 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
         if d == "cost":
             if base["cost"]["self_hosted"] or cand["cost"]["self_hosted"]:
                 notes.append("self-hosted cost is an estimate")
-            if base["cost"]["unit"] == "tokens" and cand["cost"]["unit"] == "tokens":
+            if bu == "tokens" and cu == "tokens":
                 bmodels, cmodels = sorted(base["cost"]["models"]), sorted(cand["cost"]["models"])
-                if bmodels != cmodels and not prices:
+                all_models = base["cost"]["models"] | cand["cost"]["models"]
+                covered = bool(prices) and all_models.issubset(prices.keys())
+                if bmodels != cmodels and not covered:
                     warnings.append(f"tokens are not comparable across tokenizers (baseline: {', '.join(bmodels)}, "
                                     f"candidate: {', '.join(cmodels)}); give --prices to compare in money")
-        unit = ("usd" if base["cost"]["unit"] == "usd" else "tokens (no price)") if d == "cost" else UNITS[d]
+        unit = ("usd" if bu == "usd" else "tokens (no price)") if d == "cost" else UNITS[d]
         results[d] = {"baseline": base0, "candidate": cand0, "delta": delta0, "ci": ci, "budget": t,
                       "gates": gate_of(d), "label": label, "scenarios_needed": needed, "unit": unit,
                       "note": "; ".join(notes) or None}
         if d == "speed":
-            lat_b = [m["latency_ms"] for r, _ in baseline for m in r.measures.values()
-                     if m.get("latency_ms") is not None]
-            lat_c = [m["latency_ms"] for r, _ in candidate for m in r.measures.values()
-                     if m.get("latency_ms") is not None]
-            results[d]["p50"] = {"baseline": _percentile(lat_b, 50), "candidate": _percentile(lat_c, 50)}
-            results[d]["p95"] = {"baseline": _percentile(lat_b, 95), "candidate": _percentile(lat_c, 95)}
+            lb, lc = _latencies(baseline), _latencies(candidate)
+            results[d]["p50"] = {"baseline": _percentile(lb, 50), "candidate": _percentile(lc, 50)}
+            results[d]["p95"] = {"baseline": _percentile(lb, 95), "candidate": _percentile(lc, 95)}
 
     sp95 = conf.get("speed_p95", {})
     if sp95.get("gate"):
         t95 = sp95["budget"] if sp95.get("budget") is not None else DEFAULT_BUDGET["speed_p95"]
-        lat_b = _latencies(baseline)
-        lat_c = _latencies(candidate)
-        b95, c95 = _percentile(lat_b, 95), _percentile(lat_c, 95)
+        b95, c95 = _percentile(_latencies(baseline), 95), _percentile(_latencies(candidate), 95)
         note = "low confidence: pooled p95, point estimate, no CI"
         if b95 is None or c95 is None:
             results["speed_p95"] = {"baseline": b95, "candidate": c95, "delta": None, "ci": None,
                                     "budget": float(t95), "gates": False, "label": "n/a",
                                     "scenarios_needed": None, "unit": "ms", "note": note}
+            warnings.append("speed_p95 n/a: missing on one side, not gated")
         else:
             delta = (c95 - b95) / b95 if b95 else c95 - b95
             results["speed_p95"] = {"baseline": b95, "candidate": c95, "delta": delta, "ci": None,
@@ -383,7 +386,8 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
     blocked = violations > 0 or any(e["label"] == "WORSE" for e in gated)
     verdict = "BLOCK" if blocked else ("REVIEW" if any(e["label"] == "INCONCLUSIVE" for e in gated) else "SHIP")
 
-    cps_b, cps_c = (None, None) if unit_mismatch else (_per_solved(base, baseline), _per_solved(cand, candidate))
+    cps_b = _per_solved(base, baseline) if active["cost"] else None
+    cps_c = _per_solved(cand, candidate) if active["cost"] else None
     cost_per_solved = {"baseline": cps_b, "candidate": cps_c,
                        "delta_pct": (100 * (cps_c - cps_b) / cps_b) if cps_b and cps_c is not None else None}
 
@@ -417,16 +421,11 @@ def compare(baseline: list[tuple[Any, list[Any]]], candidate: list[tuple[Any, li
     return _clean(out)
 
 
-def _pass_k_table(view: dict[str, Any], scen: list[str], k: int) -> dict[str, list[float]]:
-    """Per scenario, the full-data pass^k as a one-element run list (reuses _scenario_mean)."""
-    return {s: [_pass_k(view["tables"]["correctness"][s], k)] for s in scen}
-
-
 def _latencies(side: list[tuple[Any, list[Any]]]) -> list[float]:
     return [m["latency_ms"] for r, _ in side for m in r.measures.values() if m.get("latency_ms") is not None]
 
 
 def _per_solved(view: dict[str, Any], side: list[tuple[Any, list[Any]]]) -> float | None:
-    values = [v for v in view["cost"]["values"].values() if v is not None]
+    values = [v for run_vals in view["cost"]["values"] for v in run_vals.values() if v is not None]
     clean = sum(sum(r.clean_by_scenario.values()) for r, _ in side)
     return sum(values) / clean if values and clean else None
