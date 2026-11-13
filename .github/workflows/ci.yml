@@ -36,7 +36,32 @@ jobs:
           band: examples/gate/band.json
           golden: examples/gate/golden.json
           comment: "false"
+      - id: compare_same
+        uses: ./
+        with:
+          version: .
+          baseline: examples/gate/baseline_glm_run1.json examples/gate/baseline_glm_run2.json
+          candidate: examples/gate/baseline_glm_run1.json examples/gate/baseline_glm_run2.json
+          golden: examples/gate/golden.json
+          resamples: "400"
+          comment: "false"
+          audit: faultgate-compare-audit
+      - id: compare_regression
+        uses: ./
+        continue-on-error: true
+        with:
+          version: .
+          baseline: examples/gate/baseline_glm_run1.json examples/gate/baseline_glm_run2.json
+          candidate: examples/gate/candidate_gpt.json examples/gate/candidate_gpt.json
+          golden: examples/gate/golden.json
+          resamples: "400"
+          comment: "false"
       - run: |
           test "${{ steps.regression.outcome }}" = failure && test "${{ steps.baseline.outcome }}" = success
           test "${{ steps.regression.outputs.verdict }}" = FAIL && test "${{ steps.baseline.outputs.verdict }}" = PASS
           test -s faultgate-audit/verdict.json && test -s faultgate-audit/repro.sh
+          test "${{ steps.compare_same.outcome }}" = success
+          test "${{ steps.compare_regression.outcome }}" = failure
+          test "${{ steps.compare_regression.outputs.verdict }}" = BLOCK
+          test -s faultgate-compare-audit/verdict.json
+          case "${{ steps.compare_same.outputs.verdict }}" in SHIP|REVIEW) ;; *) exit 1 ;; esac

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- GitHub Action compare mode. `baseline` + `candidate` (run files, whitespace/newline separated, each word may be a glob) run `faultgate compare` instead of `check` in the same step; `budget`, `prices`, `seed` (default 0), `resamples` (default 2000) and `strict` pass through. Without `candidate` the action behaves exactly as before; `traces` is now `required: false` (needed in check mode). Setting both prints `::error::faultgate: set traces (check) or baseline + candidate (compare), not both`, neither prints `::error::faultgate: set traces (check) or baseline + candidate (compare)`, and `candidate` without `baseline` prints `::error::faultgate: compare mode needs baseline as well as candidate`; each writes code 2, which the final fail-closed step turns into a failed job. The `verdict` output now also reports SHIP, REVIEW and BLOCK. Compare mode needs faultgate >= 0.5.0.
+- CI runs the action twice more against `examples/gate`: the GLM runs against themselves (must succeed, SHIP or REVIEW) and the GPT candidate (BLOCK, exit 1), and asserts the compare audit artifact.
+
 ## 0.5.0 — 2026-11-13
 
 `faultgate compare`: is the new model better or worse? One command over the runs both sides already produced, one verdict, no LLM judge, nothing leaves the machine.

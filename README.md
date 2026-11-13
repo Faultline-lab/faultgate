@@ -465,13 +465,28 @@ Prices are matched on the trace's model name: `gen_ai.request.model` on the root
     policy: traces/policy.json         # optional
 ```
 
-Exit 1 on gate FAIL, so the job fails; PASS and INCONCLUSIVE pass (INCONCLUSIVE prints how many more scenarios to run). Every run also:
+Or compare two models — set `baseline` and `candidate` instead of `traces` (run files, whitespace or newline separated; each word may be a glob):
+
+```yaml
+- uses: Faultline-lab/faultgate@main
+  with:
+    version: ">=0.5.0"                  # compare mode needs faultgate >= 0.5.0
+    baseline: base/run*.json           # runs of the current model
+    candidate: cand/run*.json          # runs of the new model, on the same scenarios
+    budget: base/budget.json           # optional: what counts as no real change
+    prices: base/prices.json           # optional: per-model token or GPU-hour prices
+    strict: "true"                     # optional: fail the job on REVIEW as well as BLOCK
+```
+
+BLOCK fails the job; REVIEW passes it unless `strict: "true"`; SHIP passes. Set `version` until 0.5.0 is the latest release on PyPI.
+
+Exit 1 on gate FAIL (or compare BLOCK), so the job fails; PASS, INCONCLUSIVE, SHIP and REVIEW pass (INCONCLUSIVE prints how many more scenarios to run). Every run also:
 
 - writes the Markdown summary to the **job summary**, and on pull requests posts **one PR comment** (updated in place on later pushes, found by its `<!-- faultgate -->` marker): the verdict, gate numbers and p-value, fired checks, the policy hard block with each broken rule, failing traces with the step and reason, the latency / token / cost change against the baseline, and the exact command to reproduce it locally. Give the job `permissions: pull-requests: write`, or set `comment: "false"`;
 - uploads an **audit artifact** (`faultgate-audit`): `verdict.json` (verdict, exit code, faultgate version, UTC time, every input file with its SHA-256, gate numbers), `failing_traces.json` (each failing trace and every reason) and `repro.sh`. No prompts, answers or tool payloads are copied into it, and reasons are masked by `redact`;
-- exposes the verdict as the step output `verdict`.
+- exposes the verdict as the step output `verdict`: PASS, FAIL or INCONCLUSIVE (check), SHIP, REVIEW or BLOCK (compare).
 
-Other inputs: `format`, `redact`, `checks`, `judge`, `report`, `audit`, `outcomes`, `version`. `version` takes a version (`0.3.0`), a specifier (`>=0.3`), a full requirement (`faultgate==0.3.0`) or any pip spec (a path, `git+https://...`); the default is the latest release. The same files come from the CLI with `--markdown summary.md --audit audit/`. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes, with matching verdict outputs and audit files.
+Other inputs: `format`, `redact`, `checks`, `judge`, `report`, `audit`, `outcomes`, `version`; in compare mode also `baseline`, `candidate`, `budget`, `prices`, `seed` (default `0`), `resamples` (default `2000`) and `strict`. `version` takes a version (`0.3.0`), a specifier (`>=0.3`), a full requirement (`faultgate==0.3.0`) or any pip spec (a path, `git+https://...`); the default is the latest release. The same files come from the CLI with `--markdown summary.md --audit audit/`. The action installs nothing heavier than pydantic; our own CI runs it against this repo's examples and asserts that the GPT candidate fails and the GLM baseline passes, with matching verdict outputs and audit files.
 
 ## How much to trust a verdict
 
