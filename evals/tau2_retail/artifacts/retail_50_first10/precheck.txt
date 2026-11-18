@@ -1,0 +1,3 @@
+policy keys: allow, max_calls_per_arg, required_args, requires (after, invalidated_by, latest, result, same_arg, success, tool), values
+precheck: OK - format otlp - checked 10 of 10 traces - 64 tool steps read - 0 error(s), 0 warning(s)
+EXIT=0

@@ -10,3 +10,4 @@ build/
 dist/
 .demo/
 .aes/runs/
+evals/tau2_retail/artifacts/**/task-*.simulation.json
