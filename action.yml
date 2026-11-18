@@ -1,5 +1,5 @@
 name: faultgate
-description: Gate a deploy on recorded agent traces — rule checks, optional band, golden answers and policy. Exit 1 on FAIL. Set baseline + candidate to compare two models instead; exit 1 on BLOCK.
+description: Run AI agent evals in CI. Compare LLM changes, catch tool-use regressions, and report a verdict on pull requests.
 branding: { icon: shield, color: red }
 inputs:
   traces:  { description: "check mode: trace export to check (OTLP/JSON, OpenInference, Langfuse, LangSmith or Braintrust); needed in check mode", required: false, default: "" }
